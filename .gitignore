@@ -2,3 +2,7 @@ node_modules
 dist
 *.local
 .DS_Store
+public/favicon.ico
+public/pwa-*.png
+public/maskable-icon-*.png
+public/apple-touch-icon-*.png

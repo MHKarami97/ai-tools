@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { features } from '@/config/features'
 
-const quickActions = features.filter((feature) => feature.name !== 'home')
+const quickActions = features.filter((feature) => feature.showInNav && feature.name !== 'home')
 </script>
 
 <template>

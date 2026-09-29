@@ -40,4 +40,12 @@ export const features: readonly Feature[] = [
     showInNav: true,
     load: () => import('@/pages/SettingsPage.vue'),
   },
+  {
+    path: '/offline',
+    name: 'offline',
+    label: 'آفلاین',
+    description: 'راهنمای استفاده بدون اینترنت',
+    showInNav: false,
+    load: () => import('@/pages/OfflinePage.vue'),
+  },
 ]
