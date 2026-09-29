@@ -1,4 +1,6 @@
 export type Backend = 'webgpu' | 'wasm'
+export type BackendPreference = 'auto' | 'wasm'
+export type SynthesisMode = 'split' | 'pack'
 
 export interface RuntimeInfo {
   readonly backend: Backend
@@ -9,16 +11,42 @@ export interface RuntimeInfo {
 export interface SynthesisResult {
   readonly samples: Float32Array
   readonly sampleRate: number
+  readonly phonemes: string
+  readonly sentences: number
 }
 
-export type TtsRequest =
-  | { id: number; type: 'init'; payload: { model: 'dummy' } }
-  | { id: number; type: 'synthesize'; payload: { text: string } }
+export interface VoiceReport {
+  readonly seconds: number
+  readonly droppedMs: number
+}
 
-export type TtsResponse =
-  | { id: number; type: 'ready'; payload: RuntimeInfo }
-  | { id: number; type: 'result'; payload: SynthesisResult }
-  | { id: number; type: 'error'; payload: { message: string } }
+export interface TtsRequestMap {
+  init: { model: 'dummy' | 'persian'; backend: BackendPreference }
+  setVoice: { id: string; samples: Float32Array }
+  synthesize: { text: string; voiceId: string; mode: SynthesisMode; pace: number }
+  synthesizePhonemes: { phonemes: string; voiceId: string; pace: number }
+  phonemize: { text: string; mode: SynthesisMode }
+}
+
+export type TtsRequestType = keyof TtsRequestMap
+
+export type TtsRequest = {
+  [K in TtsRequestType]: { id: number; type: K; payload: TtsRequestMap[K] }
+}[TtsRequestType]
+
+export interface TtsResponseMap {
+  ready: RuntimeInfo
+  voiceReady: VoiceReport
+  result: SynthesisResult
+  phonemes: { phonemes: string }
+  status: { message: string }
+  progress: { done: number; total: number }
+  error: { message: string }
+}
+
+export type TtsResponse = {
+  [K in keyof TtsResponseMap]: { id: number; type: K; payload: TtsResponseMap[K] }
+}[keyof TtsResponseMap]
 
 export interface WorkerScope {
   onmessage: ((event: MessageEvent<TtsRequest>) => void) | null

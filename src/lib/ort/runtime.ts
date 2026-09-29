@@ -1,10 +1,7 @@
 import * as ort from 'onnxruntime-web/webgpu'
-import type { Backend } from '@/workers/protocol'
+import type { Backend, BackendPreference } from '@/workers/protocol'
 
-export interface SessionHandle {
-  readonly session: ort.InferenceSession
-  readonly backend: Backend
-}
+export type ExternalData = ort.InferenceSession.SessionOptions['externalData']
 
 export { ort }
 
@@ -22,15 +19,28 @@ async function hasWebGpu(): Promise<boolean> {
   }
 }
 
-export async function createSession(model: Uint8Array): Promise<SessionHandle> {
-  if (await hasWebGpu()) {
+export async function detectBackend(preference: BackendPreference): Promise<Backend> {
+  return preference === 'auto' && (await hasWebGpu()) ? 'webgpu' : 'wasm'
+}
+
+export function createSession(
+  model: Uint8Array,
+  backend: Backend,
+  externalData?: ExternalData,
+): Promise<ort.InferenceSession> {
+  return ort.InferenceSession.create(model, { executionProviders: [backend], externalData })
+}
+
+export async function withBackendFallback<T>(
+  preference: BackendPreference,
+  build: (backend: Backend) => Promise<T>,
+): Promise<{ value: T; backend: Backend }> {
+  if ((await detectBackend(preference)) === 'webgpu') {
     try {
-      const session = await ort.InferenceSession.create(model, { executionProviders: ['webgpu'] })
-      return { session, backend: 'webgpu' }
+      return { value: await build('webgpu'), backend: 'webgpu' }
     } catch {
       // WebGPU session creation failed; fall back to WASM below.
     }
   }
-  const session = await ort.InferenceSession.create(model, { executionProviders: ['wasm'] })
-  return { session, backend: 'wasm' }
+  return { value: await build('wasm'), backend: 'wasm' }
 }
