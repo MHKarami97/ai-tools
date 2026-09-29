@@ -26,7 +26,7 @@ export class TtsClient {
 
   private ensureWorker(): Worker {
     if (this.worker) return this.worker
-    const worker = new Worker(new URL('../../workers/ttsWorker.ts', import.meta.url), { type: 'module' })
+    const worker = new Worker(new URL('../../workers/tts.Worker.ts', import.meta.url), { type: 'module' })
     worker.onmessage = (event: MessageEvent<TtsResponse>) => this.handleResponse(event.data)
     worker.onerror = (event) => this.rejectAll(new Error(event.message || 'Worker crashed.'))
     this.worker = worker

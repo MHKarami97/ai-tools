@@ -12,7 +12,11 @@ let processor: DemucsProcessor | null = null
 let loadingPromise: Promise<DemucsProcessor> | null = null
 
 function send(message: SplitterMessage, transfer: Transferable[] = []): void {
-  self.postMessage(message, transfer)
+  const scope = self as unknown as {
+    postMessage(message: SplitterMessage, options?: { transfer: Transferable[] }): void
+  }
+
+  scope.postMessage(message, transfer.length > 0 ? { transfer } : undefined)
 }
 
 async function fetchModelBuffer(): Promise<ArrayBuffer> {

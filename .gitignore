@@ -7,3 +7,4 @@ public/pwa-*.png
 public/maskable-icon-*.png
 public/apple-touch-icon-*.png
 public/ort
+public/src/workers/ort

@@ -2,7 +2,7 @@ import { cp, mkdir, readdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 
 const source = path.resolve('node_modules/onnxruntime-web/dist')
-const target = path.resolve('public/ort')
+const target = path.resolve('public/src/workers/ort')
 
 await rm(target, { recursive: true, force: true })
 await mkdir(target, { recursive: true })
