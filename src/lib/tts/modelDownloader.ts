@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from 'idb'
-import { MODEL_FILES, type ModelFile } from './modelRegistry'
+import { MODEL_FILES, TOTAL_SIZE } from './modelRegistry'
 
 const DB_NAME = 'tts-models'
 const STORE_NAME = 'files'

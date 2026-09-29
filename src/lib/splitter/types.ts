@@ -10,6 +10,11 @@ export interface SplitterModelProgress {
   readonly total: number
 }
 
+export interface SplitterModelCached {
+  readonly type: 'model-cached'
+  readonly bytes: number
+}
+
 export interface SplitterProgress {
   readonly type: 'progress'
   readonly progress: number
@@ -40,6 +45,7 @@ export interface SplitterError {
 
 export type SplitterMessage =
   | SplitterModelProgress
+  | SplitterModelCached
   | SplitterProgress
   | SplitterStatus
   | SplitterDone

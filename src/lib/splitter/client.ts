@@ -1,4 +1,4 @@
-import type { SplitterInput, SplitterMessage, SplitterDone } from './types'
+import type { SplitterInput, SplitterMessage } from './types'
 
 export interface SplitterProgressState {
   type: 'model' | 'process'
@@ -81,13 +81,13 @@ export class SplitterClient {
           reject(new Error(data.message))
         }
       }
-      this.worker.addEventListener('message', handleMessage)
-      this.worker.addEventListener('error', (error) => {
+      this.worker?.addEventListener('message', handleMessage)
+      this.worker?.addEventListener('error', (error) => {
         cleanup()
         reject(error)
       })
       const input: SplitterInput = { type: 'separate', left: left.buffer, right: right.buffer }
-      this.worker.postMessage(input, [left.buffer, right.buffer])
+      this.worker?.postMessage(input, [left.buffer, right.buffer] as unknown as WindowPostMessageOptions)
     })
   }
 
