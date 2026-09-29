@@ -6,6 +6,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 const base = process.env.BASE_PATH ?? '/'
 
+const crossOriginIsolationHeaders = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+}
+
 export default defineConfig({
   base,
   plugins: [
@@ -37,10 +42,25 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: /\/ort\/.+\.(?:mjs|wasm)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ort-runtime',
+              expiration: { maxEntries: 8 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
       },
     }),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  optimizeDeps: { exclude: ['onnxruntime-web'] },
+  worker: { format: 'es' },
+  server: { headers: crossOriginIsolationHeaders },
+  preview: { headers: crossOriginIsolationHeaders },
 })
