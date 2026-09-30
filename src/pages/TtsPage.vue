@@ -236,6 +236,23 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+      <h2 class="font-semibold">۲. صدای مرجع</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-400">
+        یک فایل صوتی کوتاه (حدود ۵ ثانیه، بدون موسیقی) انتخاب کنید. مدل صدای شما را تقلید می‌کند.
+      </p>
+      <input
+        type="file"
+        accept="audio/*"
+        :disabled="modelsReady !== true || busy"
+        class="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white disabled:opacity-50"
+        @change="onVoiceChange"
+      />
+      <p v-if="hasVoice" class="text-sm text-emerald-700 dark:text-emerald-400">
+        صدای ذخیره‌شده: <span dir="ltr">{{ voiceName || VOICE_ID }}</span>
+      </p>
+    </div>
+
+    <div class="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
       <h2 class="font-semibold">۳. متن</h2>
       <textarea
         v-model="text"
@@ -269,23 +286,6 @@ onBeforeUnmount(() => {
       </button>
       <p v-if="busy && sentenceProgress" class="text-sm text-slate-500">
         جمله {{ sentenceProgress.done }} از {{ sentenceProgress.total }}
-      </p>
-    </div>
-
-    <div class="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-      <h2 class="font-semibold">۲. صدای مرجع</h2>
-      <p class="text-sm text-slate-600 dark:text-slate-400">
-        یک فایل صوتی کوتاه (حدود ۵ ثانیه، بدون موسیقی) انتخاب کنید. مدل صدای شما را تقلید می‌کند.
-      </p>
-      <input
-        type="file"
-        accept="audio/*"
-        :disabled="modelsReady !== true || busy"
-        class="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white disabled:opacity-50"
-        @change="onVoiceChange"
-      />
-      <p v-if="hasVoice" class="text-sm text-emerald-700 dark:text-emerald-400">
-        صدای ذخیره‌شده: <span dir="ltr">{{ voiceName || VOICE_ID }}</span>
       </p>
     </div>
 
