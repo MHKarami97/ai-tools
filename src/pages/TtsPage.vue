@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import HistoryList from '@/components/HistoryList.vue'
+import { encodeMp3 } from '@/lib/audio/mp3Client'
 import { decodeToMono } from '@/lib/audio/resample'
 import { encodeWav } from '@/lib/audio/wav'
 import { formatBytes } from '@/lib/format'
+import { historyStore } from '@/lib/history/historyStore'
 import { requestPersistentStorage } from '@/lib/storageEstimate'
 import { TtsClient } from '@/lib/tts/client'
 import { MAX_PACE, MAX_TEXT_CHARS, MIN_PACE } from '@/lib/tts/limits'
@@ -17,6 +20,8 @@ import type { SynthesisMode } from '@/workers/protocol'
 const SAMPLE_RATE = 24000
 const VOICE_ID = 'custom'
 const VOICE_NAME_KEY = 'tts-voice-name'
+const MP3_KBPS = 96
+const SOURCE_PREVIEW_CHARS = 60
 
 const client = new TtsClient()
 let engineReady = false
@@ -33,17 +38,37 @@ const hasVoice = ref(false)
 const voiceName = ref('')
 const busy = ref(false)
 const sentenceProgress = ref<{ done: number; total: number } | null>(null)
-const audioUrl = ref<string | null>(null)
+const wavUrl = ref<string | null>(null)
+const mp3Url = ref<string | null>(null)
+const wavSize = ref(0)
+const mp3Size = ref(0)
+const outputName = ref('')
 const errorMessage = ref('')
 
 const canSynthesize = computed(
   () => modelsReady.value === true && hasVoice.value && text.value.trim().length > 0 && !busy.value,
 )
 const downloadPercent = computed(() => Math.round((download.value?.fraction ?? 0) * 100))
+const playerUrl = computed(() => mp3Url.value ?? wavUrl.value)
+const wavName = computed(() => outputName.value.replace(/\.mp3$/, '.wav'))
 
-function setAudio(blob: Blob): void {
-  if (audioUrl.value) URL.revokeObjectURL(audioUrl.value)
-  audioUrl.value = URL.createObjectURL(blob)
+function revokeOutputs(): void {
+  if (wavUrl.value) URL.revokeObjectURL(wavUrl.value)
+  if (mp3Url.value) URL.revokeObjectURL(mp3Url.value)
+  wavUrl.value = null
+  mp3Url.value = null
+}
+
+async function tryEncodeMp3(samples: Float32Array): Promise<Blob | null> {
+  try {
+    return await encodeMp3([samples], SAMPLE_RATE, MP3_KBPS)
+  } catch {
+    return null
+  }
+}
+
+function timestampName(): string {
+  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
 }
 
 async function guarded(action: () => Promise<void>): Promise<void> {
@@ -123,7 +148,22 @@ function synthesize(): void {
     const result = await client.synthesizeText(text.value.trim(), VOICE_ID, mode.value, pace.value, (done, total) => {
       sentenceProgress.value = { done, total }
     })
-    setAudio(encodeWav([result.audio], SAMPLE_RATE))
+
+    const wav = encodeWav([result.audio], SAMPLE_RATE)
+    const mp3 = await tryEncodeMp3(result.audio)
+
+    revokeOutputs()
+    wavUrl.value = URL.createObjectURL(wav)
+    wavSize.value = wav.size
+    mp3Url.value = mp3 ? URL.createObjectURL(mp3) : null
+    mp3Size.value = mp3?.size ?? 0
+    outputName.value = `tts-${timestampName()}.${mp3 ? 'mp3' : 'wav'}`
+
+    await historyStore.add({
+      kind: 'tts',
+      sourceName: text.value.trim().slice(0, SOURCE_PREVIEW_CHARS),
+      outputs: [outputName.value],
+    })
   })
 }
 
@@ -136,7 +176,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   abortController?.abort()
   client.terminate()
-  if (audioUrl.value) URL.revokeObjectURL(audioUrl.value)
+  revokeOutputs()
 })
 </script>
 
@@ -247,11 +287,18 @@ onBeforeUnmount(() => {
       {{ errorMessage }}
     </p>
 
-    <div v-if="audioUrl" class="space-y-2">
-      <audio :src="audioUrl" controls class="w-full" />
-      <a :href="audioUrl" download="tts.wav" class="inline-block rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700">
-        دانلود WAV
-      </a>
+    <div v-if="playerUrl" class="space-y-2">
+      <audio :src="playerUrl" controls class="w-full" />
+      <div class="flex flex-wrap gap-2 text-sm">
+        <a v-if="mp3Url" :href="mp3Url" :download="outputName" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-white">
+          دانلود MP3 ({{ formatBytes(mp3Size) }})
+        </a>
+        <a v-if="wavUrl" :href="wavUrl" :download="wavName" class="rounded-lg border border-slate-300 px-3 py-1.5 dark:border-slate-700">
+          دانلود WAV ({{ formatBytes(wavSize) }})
+        </a>
+      </div>
     </div>
   </section>
+
+  <HistoryList kind="tts" title="تاریخچهٔ تبدیل متن به گفتار" source-label="متن" />
 </template>
