@@ -13,8 +13,8 @@ function toInt16(samples: Float32Array): Int16Array {
   return output
 }
 
-function copyBytes(chunk: Int8Array): Uint8Array {
-  return new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.length).slice()
+function copyBytes(chunk: ArrayBufferView): Uint8Array {
+  return new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength).slice()
 }
 
 class Mp3Job {
