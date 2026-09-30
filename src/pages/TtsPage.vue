@@ -64,6 +64,7 @@ async function tryEncodeMp3(samples: Float32Array): Promise<Blob | null> {
   try {
     return await encodeMp3([samples], SAMPLE_RATE, MP3_KBPS)
   } catch {
+    console.error(error)
     return null
   }
 }
@@ -78,6 +79,7 @@ async function guarded(action: () => Promise<void>): Promise<void> {
   try {
     await action()
   } catch (error) {
+    console.error(error)
     errorMessage.value = error instanceof Error ? error.message : String(error)
   } finally {
     busy.value = false
@@ -106,6 +108,7 @@ async function startDownload(): Promise<void> {
     }, abortController.signal)
     modelsReady.value = await allModelsCached()
   } catch (error) {
+    console.error(error)
     const aborted = error instanceof DOMException && error.name === 'AbortError'
     if (!aborted) errorMessage.value = error instanceof Error ? error.message : String(error)
   } finally {
