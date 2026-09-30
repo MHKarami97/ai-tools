@@ -231,15 +231,15 @@ export class PocketTtsEngine {
       noise: new ort.Tensor('float32', noise, [1, ldim]),
       cache: new ort.Tensor('float32', cache, [layers, 2, capacity, heads, headSize]),
     })
-    const newKv = output.newkv.data as Float32Array
+    const newKv = (output.new_kv ?? output.newkv).data as Float32Array
     const steps = output.newkv.dims[2]
     const rowSize = steps * heads * headSize
     for (let block = 0; block < layers * 2; block++) {
       cache.set(newKv.subarray(block * rowSize, (block + 1) * rowSize), (block * capacity + offset) * heads * headSize)
     }
     return {
-      latent: new Float32Array(output.latent.data as Float32Array),
-      eos: (output.eos.data as Float32Array)[0],
+      latent: new Float32Array((output.latent ?? output.latents).data as Float32Array),
+      eos: ((output.eos ?? output.eos_logit).data as Float32Array)[0],
       offset: offset + steps,
     }
   }
