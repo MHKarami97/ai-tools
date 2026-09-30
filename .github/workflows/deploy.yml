@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Copy ORT runtime files
-        run: node scripts/copy-ort.mjs
+        run: node scripts/copy-ort-assets.mjs
 
       - name: Build
         run: npm run build
