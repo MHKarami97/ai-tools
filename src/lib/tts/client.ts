@@ -1,16 +1,16 @@
-import type { Remote } from 'comlink'
-import { wrap } from 'comlink'
+import { proxy, wrap, type Remote } from 'comlink'
 import { openDB, type IDBPDatabase } from 'idb'
 import type { SynthesisMode, VoiceReport } from '@/workers/protocol'
 import type { TextSynthesis } from '@/lib/tts/engine'
 
-const MODEL_DB = 'tts-models'
-const MODEL_STORE = 'files'
 const VOICE_DB = 'tts-voice-samples'
 const VOICE_STORE = 'samples'
+const NOT_INITIALISED = 'کلاینت مقداردهی نشده است'
 
-type WorkerApi = Remote<{
-  init(progress?: (done: number, total: number) => void): Promise<void>
+type ProgressCallback = (done: number, total: number) => void
+
+interface WorkerApi {
+  init(): Promise<void>
   registerVoice(id: string, samples: Float32Array): Promise<VoiceReport>
   phonemize(text: string, mode: SynthesisMode): Promise<string>
   synthesizeText(
@@ -18,94 +18,85 @@ type WorkerApi = Remote<{
     voiceId: string,
     mode: SynthesisMode,
     pace: number,
-    onProgress?: (done: number, total: number) => void,
+    onProgress?: ProgressCallback,
   ): Promise<TextSynthesis>
   synthesizePhonemes(phonemes: string, voiceId: string, pace: number): Promise<Float32Array>
-}>
+}
 
 export class TtsClient {
-  private worker: WorkerApi | null = null
-  private dbPromise: Promise<IDBPDatabase> | null = null
+  private worker: Worker | null = null
+  private api: Remote<WorkerApi> | null = null
+  private voiceDbPromise: Promise<IDBPDatabase> | null = null
 
   async init(): Promise<void> {
-    if (this.worker) return
-    const worker = new Worker(new URL('@/workers/tts.worker.ts', import.meta.url), { type: 'module' })
-    this.worker = wrap<WorkerApi>(worker)
-    await this.worker.init((done, total) => this.updateModelProgress(done, total))
-  }
-
-  private async db(): Promise<IDBPDatabase> {
-    if (!this.dbPromise) {
-      this.dbPromise = openDB(MODEL_DB, 1, {
-        upgrade(db) {
-          if (!db.objectStoreNames.contains(MODEL_STORE)) {
-            db.createObjectStore(MODEL_STORE)
-          }
-        },
-      })
+    if (this.api) return
+    const worker = new Worker(new URL('../../workers/tts.worker.ts', import.meta.url), { type: 'module' })
+    const api = wrap<WorkerApi>(worker)
+    try {
+      await api.init()
+    } catch (error) {
+      worker.terminate()
+      throw error
     }
-    return this.dbPromise
+    this.worker = worker
+    this.api = api
   }
 
-  private async voiceDb(): Promise<IDBPDatabase> {
-    return openDB(VOICE_DB, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(VOICE_STORE)) {
-          db.createObjectStore(VOICE_STORE)
-        }
-      },
-    })
+  terminate(): void {
+    this.worker?.terminate()
+    this.worker = null
+    this.api = null
   }
 
-  private async updateModelProgress(done: number, total: number): Promise<void> {
-    const db = await this.db()
-    const tx = db.transaction(MODEL_STORE, 'readwrite')
-    await tx.store.put({ done, total }, 'progress')
-    await tx.done
-  }
-
-  async getModelProgress(): Promise<{ done: number; total: number } | null> {
-    const db = await this.db()
-    return db.get(MODEL_STORE, 'progress')
-  }
-
-  async clearModelProgress(): Promise<void> {
-    const db = await this.db()
-    await db.delete(MODEL_STORE, 'progress')
-  }
-
-  async registerVoice(id: string, audioBuffer: AudioBuffer): Promise<VoiceReport> {
-    if (!this.worker) throw new Error('کلاینت مقداردهی نشده است')
-    const samples = audioBuffer.getChannelData(0)
-    const report = await this.worker.registerVoice(id, samples)
-    const vdb = await this.voiceDb()
-    await vdb.put(VOICE_STORE, samples, id)
+  async registerVoice(id: string, samples: Float32Array): Promise<VoiceReport> {
+    const report = await this.requireApi().registerVoice(id, samples)
+    const database = await this.voiceDb()
+    await database.put(VOICE_STORE, samples, id)
     return report
   }
 
-  async getVoiceSamples(id: string): Promise<Float32Array | null> {
-    const vdb = await this.voiceDb()
-    return vdb.get(VOICE_STORE, id)
+  async hasSavedVoice(id: string): Promise<boolean> {
+    const database = await this.voiceDb()
+    return (await database.getKey(VOICE_STORE, id)) !== undefined
   }
 
-  async phonemize(text: string, mode: SynthesisMode): Promise<string> {
-    if (!this.worker) throw new Error('کلاینت مقداردهی نشده است')
-    return this.worker.phonemize(text, mode)
+  async restoreVoice(id: string): Promise<VoiceReport | null> {
+    const database = await this.voiceDb()
+    const samples: Float32Array | undefined = await database.get(VOICE_STORE, id)
+    return samples ? this.requireApi().registerVoice(id, samples) : null
   }
 
-  async synthesizeText(
+  phonemize(text: string, mode: SynthesisMode): Promise<string> {
+    return this.requireApi().phonemize(text, mode)
+  }
+
+  synthesizeText(
     text: string,
     voiceId: string,
     mode: SynthesisMode,
     pace: number,
-    onProgress?: (done: number, total: number) => void,
+    onProgress?: ProgressCallback,
   ): Promise<TextSynthesis> {
-    if (!this.worker) throw new Error('کلاینت مقداردهی نشده است')
-    return this.worker.synthesizeText(text, voiceId, mode, pace, onProgress)
+    return this.requireApi().synthesizeText(text, voiceId, mode, pace, onProgress ? proxy(onProgress) : undefined)
   }
 
-  async synthesizePhonemes(phonemes: string, voiceId: string, pace: number): Promise<Float32Array> {
-    if (!this.worker) throw new Error('کلاینت مقداردهی نشده است')
-    return this.worker.synthesizePhonemes(phonemes, voiceId, pace)
+  synthesizePhonemes(phonemes: string, voiceId: string, pace: number): Promise<Float32Array> {
+    return this.requireApi().synthesizePhonemes(phonemes, voiceId, pace)
+  }
+
+  private requireApi(): Remote<WorkerApi> {
+    if (!this.api) throw new Error(NOT_INITIALISED)
+    return this.api
+  }
+
+  private voiceDb(): Promise<IDBPDatabase> {
+    this.voiceDbPromise ??= openDB(VOICE_DB, 1, {
+      upgrade(database) {
+        if (!database.objectStoreNames.contains(VOICE_STORE)) {
+          database.createObjectStore(VOICE_STORE)
+        }
+      },
+    })
+    return this.voiceDbPromise
   }
 }

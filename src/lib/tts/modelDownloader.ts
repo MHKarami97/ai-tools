@@ -1,80 +1,146 @@
 import { openDB, type IDBPDatabase } from 'idb'
-import { MODEL_FILES, TOTAL_SIZE } from './modelRegistry'
+import { MODEL_FILES, type ModelFile } from './modelRegistry'
 
 const DB_NAME = 'tts-models'
 const STORE_NAME = 'files'
-const PROGRESS_KEY = 'download-progress'
 
-interface ProgressState {
-  done: number
-  total: number
-  etaSeconds: number | null
+export interface DownloadProgress {
+  readonly fileName: string
+  readonly filesDone: number
+  readonly fileCount: number
+  readonly fraction: number
+  readonly downloadedBytes: number
+  readonly bytesPerSecond: number
 }
 
-let dbPromise: Promise<IDBPDatabase> | null = null
+export interface CachedModelFile {
+  readonly name: string
+  readonly size: number
+}
 
-async function db(): Promise<IDBPDatabase> {
-  if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 1, {
+class TtsModelStore {
+  private dbPromise: Promise<IDBPDatabase> | null = null
+
+  private open(): Promise<IDBPDatabase> {
+    this.dbPromise ??= openDB(DB_NAME, 1, {
       upgrade(database) {
         if (!database.objectStoreNames.contains(STORE_NAME)) {
           database.createObjectStore(STORE_NAME)
         }
       },
     })
+    return this.dbPromise
   }
-  return dbPromise
+
+  async get(name: string): Promise<Blob | undefined> {
+    const database = await this.open()
+    return database.get(STORE_NAME, name)
+  }
+
+  async put(name: string, blob: Blob): Promise<void> {
+    const database = await this.open()
+    await database.put(STORE_NAME, blob, name)
+  }
+
+  async has(name: string): Promise<boolean> {
+    const database = await this.open()
+    return (await database.getKey(STORE_NAME, name)) !== undefined
+  }
+
+  async clear(): Promise<void> {
+    const database = await this.open()
+    await database.clear(STORE_NAME)
+  }
+
+  async list(): Promise<CachedModelFile[]> {
+    const database = await this.open()
+    const entries: CachedModelFile[] = []
+    for (const file of MODEL_FILES) {
+      const value: unknown = await database.get(STORE_NAME, file.name)
+      if (value instanceof Blob) entries.push({ name: file.name, size: value.size })
+    }
+    return entries
+  }
 }
 
-export async function saveProgress(done: number, total: number, etaSeconds: number | null): Promise<void> {
-  const database = await db()
-  await database.put(STORE_NAME, { done, total, etaSeconds }, PROGRESS_KEY)
-}
+const store = new TtsModelStore()
 
-export async function loadProgress(): Promise<ProgressState | null> {
-  const database = await db()
-  return database.get(STORE_NAME, PROGRESS_KEY)
-}
+async function fetchFile(
+  file: ModelFile,
+  onProgress: (loaded: number, total: number | null) => void,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await fetch(file.url, { signal })
+  if (!response.ok) throw new Error(`دانلود ${file.name} ناموفق بود: HTTP ${response.status}`)
 
-export async function clearProgress(): Promise<void> {
-  const database = await db()
-  await database.delete(STORE_NAME, PROGRESS_KEY)
+  const length = Number(response.headers.get('content-length'))
+  const total = Number.isFinite(length) && length > 0 ? length : null
+
+  if (!response.body) {
+    const blob = await response.blob()
+    onProgress(blob.size, total ?? blob.size)
+    return blob
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let loaded = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    loaded += value.byteLength
+    onProgress(loaded, total)
+  }
+  return new Blob(chunks as BlobPart[])
 }
 
 export async function downloadModel(
-  onProgress: (done: number, total: number, etaSeconds: number | null) => void,
+  onProgress: (state: DownloadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const database = await db()
+  const startedAt = performance.now()
+  const fileCount = MODEL_FILES.length
   let downloadedBytes = 0
-  const startTime = Date.now()
 
-  for (const file of MODEL_FILES) {
-    const response = await fetch(file.url)
-    if (!response.ok) throw new Error(`دانلود ${file.name} ناموفق بود: ${response.status}`)
-    const blob = await response.blob()
-    await database.put(STORE_NAME, blob, file.name)
-    downloadedBytes += file.size
-    const elapsedSeconds = (Date.now() - startTime) / 1000
-    const speed = downloadedBytes / elapsedSeconds
-    const remainingBytes = TOTAL_SIZE - downloadedBytes
-    const etaSeconds = speed > 0 ? Math.ceil(remainingBytes / speed) : null
-    onProgress(downloadedBytes, TOTAL_SIZE, etaSeconds)
-    await saveProgress(downloadedBytes, TOTAL_SIZE, etaSeconds)
+  for (const [index, file] of MODEL_FILES.entries()) {
+    if (await store.has(file.name)) continue
+
+    const blob = await fetchFile(
+      file,
+      (loaded, total) => {
+        const elapsedSeconds = Math.max((performance.now() - startedAt) / 1000, 0.001)
+        onProgress({
+          fileName: file.name,
+          filesDone: index,
+          fileCount,
+          fraction: (index + (total ? loaded / total : 0)) / fileCount,
+          downloadedBytes: downloadedBytes + loaded,
+          bytesPerSecond: (downloadedBytes + loaded) / elapsedSeconds,
+        })
+      },
+      signal,
+    )
+    await store.put(file.name, blob)
+    downloadedBytes += blob.size
   }
 }
 
-export async function getModelBlob(name: string): Promise<Blob | null> {
-  const database = await db()
-  return database.get(STORE_NAME, name)
+export function getModelBlob(name: string): Promise<Blob | undefined> {
+  return store.get(name)
 }
 
 export async function allModelsCached(): Promise<boolean> {
-  const database = await db()
-  const tx = database.transaction(STORE_NAME, 'readonly')
-  const store = tx.objectStore(STORE_NAME)
   for (const file of MODEL_FILES) {
-    const blob = await store.get(file.name)
-    if (!blob) return false
+    if (!(await store.has(file.name))) return false
   }
   return true
+}
+
+export function listTtsModels(): Promise<CachedModelFile[]> {
+  return store.list()
+}
+
+export function clearTtsModels(): Promise<void> {
+  return store.clear()
 }

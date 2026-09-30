@@ -1,26 +1,37 @@
 export interface ModelFile {
   readonly name: string
   readonly url: string
-  readonly size: number
 }
 
-export interface ModelVersion {
-  readonly version: string
-  readonly files: ModelFile[]
-}
+const ONNX_REPO = 'Nimaone/pocket-tts-farsi-v2-onnx'
+const ONNX_BRANCH = 'main'
 
-export const MODEL_REPO = 'mhkarami97/pocket-tts-fa'
-export const MODEL_BRANCH = 'main'
-
-export const MODEL_FILES: ModelFile[] = [
-  { name: 'constants.json', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/constants.json`, size: 256 },
-  { name: 'flow.onnx', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/flow.onnx`, size: 45_000_000 },
-  { name: 'encoder.onnx', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/encoder.onnx`, size: 8_000_000 },
-  { name: 'decoder.onnx', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/decoder.onnx`, size: 35_000_000 },
-  { name: 'weights.npz', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/weights.npz`, size: 60_000_000 },
-  { name: 'decode_state_init.npz', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/decode_state_init.npz`, size: 2_000_000 },
-  { name: 'sp.onnx', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/sp.onnx`, size: 1_500_000 },
-  { name: 'g2p.onnx', url: `https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_BRANCH}/g2p.onnx`, size: 500_000 },
+const ONNX_FILE_NAMES: readonly string[] = [
+  'manifest.json',
+  'flow_lm_step.onnx',
+  'flow_lm_step.onnx.data',
+  'mimi_encoder.onnx',
+  'mimi_encoder.onnx.data',
+  'mimi_decoder_step_kv.onnx',
+  'mimi_decoder_step_kv.onnx.data',
+  'g2p_encoder.onnx',
+  'g2p_decoder.onnx',
+  'g2p_decoder.onnx.data',
+  'weights.npz',
+  'decode_state_init.npz',
 ]
 
-export const TOTAL_SIZE = MODEL_FILES.reduce((sum, file) => sum + file.size, 0)
+const TOKENIZER_FILE_NAME = 'tokenizer_ph.model'
+
+function remoteUrl(name: string): string {
+  return `https://huggingface.co/${ONNX_REPO}/resolve/${ONNX_BRANCH}/${name}`
+}
+
+function sameOriginUrl(name: string): string {
+  return `${import.meta.env.BASE_URL}models/${name}`
+}
+
+export const MODEL_FILES: readonly ModelFile[] = [
+  ...ONNX_FILE_NAMES.map((name) => ({ name, url: remoteUrl(name) })),
+  { name: TOKENIZER_FILE_NAME, url: sameOriginUrl(TOKENIZER_FILE_NAME) },
+]
