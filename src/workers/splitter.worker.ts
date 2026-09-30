@@ -5,7 +5,7 @@ import type { SplitterInput, SplitterMessage } from '@/lib/splitter/types'
 
 const MODEL_URL = CONSTANTS.DEFAULT_MODEL_URL
 ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`
-ort.env.wasm.numThreads = 1
+ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1
 ort.env.wasm.proxy = false
 
 let processor: DemucsProcessor | null = null
