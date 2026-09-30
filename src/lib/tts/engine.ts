@@ -323,7 +323,7 @@ export class PocketTtsEngine {
     return best
   }
 
-  async synthesize(input: string | readonly PlanItem[], voiceId: string, pace: number): Promise<Float32Array> {
+  async synthesize(input: string | readonly PlanItem[], voiceId: string, pace: number, onChunk?: (done: number, total: number) => void): Promise<Float32Array> {
     const clampedPace = Math.min(Math.max(pace, MIN_PACE), MAX_PACE)
     const voice = await this.prepareVoice(voiceId)
     const phrases: Array<{ phonemes: string; gap: number | null }> =
@@ -341,8 +341,9 @@ export class PocketTtsEngine {
       })
 
     const segments: Segment[] = []
-    for (const job of jobs) {
+    for (const [index, job] of jobs.entries()) {
       segments.push({ audio: await this.generateWithRetry(voice, job.chunk, this.rng.fork()), gap: job.gap })
+      onChunk?.(index + 1, jobs.length)
     }
     return timeStretch(stitch(segments, this.sampleRate), clampedPace)
   }
@@ -392,9 +393,11 @@ export class PocketTtsEngine {
       if (plan.length === 0) continue
       const tokens = plan.reduce((sum, item) => sum + this.assets.sp.encode(item.phonemes.replaceAll('1', '')).length, 0)
       const cap = tokens / this.c.tokens_per_second_estimate + this.c.gen_seconds_padding + 1
-      let audio = new Float32Array(0)
+      let audio = new Float32Array(0) as Float32Array
       for (let attempt = 0; attempt < 2; attempt++) {
-        audio = await this.synthesize(plan, voiceId, clampedPace)
+        audio = await this.synthesize(plan, voiceId, clampedPace, (done, total) =>
+          onProgress?.(index + done / total, sentences.length),
+        )
         if (audio.length / this.sampleRate <= cap + 2) break
       }
       phonemes.push(plan.map((item) => item.phonemes.replaceAll('1', '')).join(' '))

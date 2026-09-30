@@ -48,9 +48,9 @@ class TtsWorkerApi {
   private engine: PocketTtsEngine | null = null;
   private loading: Promise<void> | null = null;
 
-  init(): Promise<void> {
-    this.loading ??= this.load();
-    return this.loading;
+  init(onProgress?: (done: number, total: number) => void): Promise<void> {
+    this.loading ??= this.load(onProgress)
+    return this.loading
   }
 
   async registerVoice(id: string, samples: Float32Array): Promise<VoiceReport> {
@@ -82,30 +82,30 @@ class TtsWorkerApi {
     return this.engine;
   }
 
-  private async load(): Promise<void> {
-    configureOrt();
-    const r = this.reader;
+  private async load(onProgress?: (done: number, total: number) => void): Promise<void> {
+    configureOrt()
+    const r = this.reader
+    const total = 8
+    let done = 0
+    const track = <T>(promise: Promise<T>): Promise<T> =>
+      promise.then((value) => {
+        done += 1
+        onProgress?.(done, total)
+        return value
+      })
 
-    const manifest = JSON.parse(await r.text('manifest.json')) as Manifest;
+    const manifest = JSON.parse(await r.text('manifest.json')) as Manifest
     const [flow, encoder, decoder, g2pEncoder, g2pDecoder, weights, decoderInit, tokenizer] =
       await Promise.all([
-        r.session('flow_lm_step.onnx', 'flow_lm_step.onnx.data'),
-        r.session('mimi_encoder.onnx', 'mimi_encoder.onnx.data'),
-        r.session('mimi_decoder_step_kv.onnx', 'mimi_decoder_step_kv.onnx.data'),
-        r.session('g2p_encoder.onnx'),
-        r.session('g2p_decoder.onnx', 'g2p_decoder.onnx.data'),
-        r.npz('weights.npz'),
-        r.npz('decode_state_init.npz'),
-        r.bytes('tokenizer_ph.model'),
-      ]);
-
-    const sessions = { flow, encoder, decoder, g2pEncoder, g2pDecoder }
-    for (const [label, session] of Object.entries(sessions)) {
-      console.info(`[tts] ${label}`, {
-        inputs: session.inputNames,
-        outputs: session.outputNames,
-      })
-    }
+        track(r.session('flow_lm_step.onnx', 'flow_lm_step.onnx.data')),
+        track(r.session('mimi_encoder.onnx', 'mimi_encoder.onnx.data')),
+        track(r.session('mimi_decoder_step_kv.onnx', 'mimi_decoder_step_kv.onnx.data')),
+        track(r.session('g2p_encoder.onnx')),
+        track(r.session('g2p_decoder.onnx', 'g2p_decoder.onnx.data')),
+        track(r.npz('weights.npz')),
+        track(r.npz('decode_state_init.npz')),
+        track(r.bytes('tokenizer_ph.model')),
+      ])
 
     const assets: EngineAssets = {
       constants: manifest.constants,
@@ -116,8 +116,8 @@ class TtsWorkerApi {
       decoderInit,
       sp: SentencePieceModel.parse(tokenizer.buffer as ArrayBuffer),
       g2p: new OnnxG2P(g2pEncoder, g2pDecoder),
-    };
-    this.engine = new PocketTtsEngine(assets);
+    }
+    this.engine = new PocketTtsEngine(assets)
   }
 }
 

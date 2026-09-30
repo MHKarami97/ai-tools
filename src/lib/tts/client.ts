@@ -10,7 +10,7 @@ const NOT_INITIALISED = 'کلاینت مقداردهی نشده است'
 type ProgressCallback = (done: number, total: number) => void
 
 interface WorkerApi {
-  init(): Promise<void>
+  init(onProgress?: ProgressCallback): Promise<void>
   registerVoice(id: string, samples: Float32Array): Promise<VoiceReport>
   phonemize(text: string, mode: SynthesisMode): Promise<string>
   synthesizeText(
@@ -28,12 +28,12 @@ export class TtsClient {
   private api: Remote<WorkerApi> | null = null
   private voiceDbPromise: Promise<IDBPDatabase> | null = null
 
-  async init(): Promise<void> {
+  async init(onProgress?: ProgressCallback): Promise<void> {
     if (this.api) return
     const worker = new Worker(new URL('../../workers/tts.worker.ts', import.meta.url), { type: 'module' })
     const api = wrap<WorkerApi>(worker)
     try {
-      await api.init()
+      await api.init(onProgress ? proxy(onProgress) : undefined)
     } catch (error) {
       worker.terminate()
       throw error

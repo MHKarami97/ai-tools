@@ -38,16 +38,23 @@ const download = ref<DownloadProgress | null>(null)
 const hasVoice = ref(false)
 const voiceName = ref('')
 const busy = ref(false)
-const sentenceProgress = ref<{ done: number; total: number } | null>(null)
+const task = ref<{ label: string; fraction: number } | null>(null)
+const taskPercent = computed(() => Math.round((task.value?.fraction ?? 0) * 100))
+
 const wavUrl = ref<string | null>(null)
 const mp3Url = ref<string | null>(null)
 const wavSize = ref(0)
 const mp3Size = ref(0)
 const outputName = ref('')
 const errorMessage = ref('')
+const processingVoice = ref(false)
+
+function setTask(label: string, fraction: number): void {
+  task.value = { label, fraction: Math.min(1, Math.max(0, fraction)) }
+}
 
 const canSynthesize = computed(
-  () => modelsReady.value === true && hasVoice.value && text.value.trim().length > 0 && !busy.value,
+  () => modelsReady.value === true && hasVoice.value && text.value.trim().length > 0 && !busy.value &&!processingVoice.value,
 )
 const downloadPercent = computed(() => Math.round((download.value?.fraction ?? 0) * 100))
 const playerUrl = computed(() => mp3Url.value ?? wavUrl.value)
@@ -86,9 +93,9 @@ async function guarded(action: () => Promise<void>): Promise<void> {
   }
 }
 
-async function ensureEngine(): Promise<void> {
+async function ensureEngine(onProgress?: (done: number, total: number) => void): Promise<void> {
   if (!engineReady) {
-    await client.init()
+    await client.init(onProgress)
     engineReady = true
   }
   if (!voiceRegistered && hasVoice.value) {
@@ -135,41 +142,60 @@ function onVoiceChange(event: Event): void {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   void guarded(async () => {
-    const samples = await decodeToMono(file, SAMPLE_RATE)
-    await ensureEngine()
-    await client.registerVoice(VOICE_ID, samples)
-    voiceRegistered = true
-    hasVoice.value = true
-    voiceName.value = file.name
-    localStorage.setItem(VOICE_NAME_KEY, file.name)
+    processingVoice.value = true
+    try {
+      setTask('خواندن فایل صوتی', 0.05)
+      const samples = await decodeToMono(file, SAMPLE_RATE)
+      await ensureEngine((done, total) =>
+        setTask(`بارگذاری مدل‌ها (${done} از ${total})`, 0.1 + 0.7 * (done / total)),
+      )
+      setTask('تحلیل صدای مرجع', 0.85)
+      await client.registerVoice(VOICE_ID, samples)
+      voiceRegistered = true
+      hasVoice.value = true
+      voiceName.value = file.name
+      localStorage.setItem(VOICE_NAME_KEY, file.name)
+    } finally {
+      processingVoice.value = false
+      task.value = null
+    }
   })
 }
 
 function synthesize(): void {
   void guarded(async () => {
-    await ensureEngine()
-    const startedAt = performance.now()
-    sentenceProgress.value = null
-    const result = await client.synthesizeText(text.value.trim(), VOICE_ID, mode.value, pace.value, (done, total) => {
-      sentenceProgress.value = { done, total }
-    })
-    performanceLog.record('tts', result.audio.length / SAMPLE_RATE, performance.now() - startedAt)
+    try {
+      const needsLoad = !engineReady
+      const base = needsLoad ? 0.3 : 0
+      if (needsLoad) {
+        await ensureEngine((done, total) => setTask(`بارگذاری مدل‌ها (${done} از ${total})`, 0.3 * (done / total)))
+      }
+      const startedAt = performance.now()
+      setTask('ساخت گفتار', base)
+      const result = await client.synthesizeText(text.value.trim(), VOICE_ID, mode.value, pace.value, (done, total) =>
+        setTask('ساخت گفتار', base + (1 - base) * 0.95 * (done / total)),
+      )
+      performanceLog.record('tts', result.audio.length / SAMPLE_RATE, performance.now() - startedAt)
 
-    const wav = encodeWav([result.audio], SAMPLE_RATE)
-    const mp3 = await tryEncodeMp3(result.audio)
+      setTask('فشرده‌سازی MP3', 0.97)
+      const wav = encodeWav([result.audio], SAMPLE_RATE)
+      const mp3 = await tryEncodeMp3(result.audio)
 
-    revokeOutputs()
-    wavUrl.value = URL.createObjectURL(wav)
-    wavSize.value = wav.size
-    mp3Url.value = mp3 ? URL.createObjectURL(mp3) : null
-    mp3Size.value = mp3?.size ?? 0
-    outputName.value = `tts-${timestampName()}.${mp3 ? 'mp3' : 'wav'}`
+      revokeOutputs()
+      wavUrl.value = URL.createObjectURL(wav)
+      wavSize.value = wav.size
+      mp3Url.value = mp3 ? URL.createObjectURL(mp3) : null
+      mp3Size.value = mp3?.size ?? 0
+      outputName.value = `tts-${timestampName()}.${mp3 ? 'mp3' : 'wav'}`
 
-    await historyStore.add({
-      kind: 'tts',
-      sourceName: text.value.trim().slice(0, SOURCE_PREVIEW_CHARS),
-      outputs: [outputName.value],
-    })
+      await historyStore.add({
+        kind: 'tts',
+        sourceName: text.value.trim().slice(0, SOURCE_PREVIEW_CHARS),
+        outputs: [outputName.value],
+      })
+    } finally {
+      task.value = null
+    }
   })
 }
 
@@ -199,14 +225,7 @@ onBeforeUnmount(() => {
       <h2 class="font-semibold">۱. مدل</h2>
       <p v-if="modelsReady === null" class="text-sm text-slate-500">در حال بررسی کش...</p>
 
-      <div v-else-if="modelsReady" class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-sm text-emerald-700 dark:text-emerald-400">مدل دانلود و ذخیره شده است.</p>
-        <button type="button" class="rounded-lg border border-red-400 px-3 py-1.5 text-sm text-red-600" @click="removeModels">
-          حذف مدل
-        </button>
-      </div>
-
-      <div v-else class="space-y-3">
+      <div v-else-if="!modelsReady" class="space-y-3">
         <p class="text-sm text-slate-600 dark:text-slate-400">
           مدل حدود ۵۰۰ مگابایت است. اتصال Wi-Fi و فضای خالی کافی لازم است.
         </p>
@@ -247,6 +266,15 @@ onBeforeUnmount(() => {
         class="block w-full text-sm file:me-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white disabled:opacity-50"
         @change="onVoiceChange"
       />
+      <p v-if="processingVoice" class="text-sm text-amber-700 dark:text-amber-400">
+        در حال پردازش صدای مرجع… لطفاً صبر کنید تا کامل شود.
+      </p>
+      <div v-if="task" class="space-y-1" role="status" aria-live="polite">
+        <div class="h-2 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+          <div class="h-full bg-emerald-600 transition-all" :style="{ width: taskPercent + '%' }" />
+        </div>
+        <p class="text-xs text-slate-500">{{ task.label }} · {{ taskPercent }}%</p>
+      </div>
       <p v-if="hasVoice" class="text-sm text-emerald-700 dark:text-emerald-400">
         صدای ذخیره‌شده: <span dir="ltr">{{ voiceName || VOICE_ID }}</span>
       </p>
@@ -256,6 +284,7 @@ onBeforeUnmount(() => {
       <h2 class="font-semibold">۳. متن</h2>
       <textarea
         v-model="text"
+        :disabled="processingVoice"
         dir="auto"
         rows="5"
         :maxlength="MAX_TEXT_CHARS"
@@ -279,14 +308,17 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white disabled:opacity-50 sm:w-auto"
-        :disabled="!canSynthesize"
+        :disabled="!canSynthesize || processingVoice"
         @click="synthesize"
       >
         {{ busy ? 'در حال پردازش...' : 'ساخت گفتار' }}
       </button>
-      <p v-if="busy && sentenceProgress" class="text-sm text-slate-500">
-        جمله {{ sentenceProgress.done }} از {{ sentenceProgress.total }}
-      </p>
+      <div v-if="task" class="space-y-1" role="status" aria-live="polite">
+        <div class="h-2 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+          <div class="h-full bg-emerald-600 transition-all" :style="{ width: taskPercent + '%' }" />
+        </div>
+        <p class="text-xs text-slate-500">{{ task.label }} · {{ taskPercent }}%</p>
+      </div>
     </div>
 
     <p v-if="errorMessage" role="alert" class="rounded-lg bg-red-100 px-3 py-2 text-sm text-red-800">
