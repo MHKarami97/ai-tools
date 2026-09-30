@@ -81,6 +81,7 @@ import { SplitterClient, downloadBlob, baseName } from '@/lib/splitter/client'
 import type { SplitterProgressState, SplitterResult } from '@/lib/splitter/client'
 import { encodeMp3 } from '@/lib/audio/mp3Client'
 import { historyStore } from '@/lib/history/historyStore'
+import { performanceLog } from '@/lib/system/performanceLog'
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const isDragging = ref(false)
@@ -227,7 +228,9 @@ async function startSeparation() {
     progressPercent.value = 5
     client = new SplitterClient()
     client.onProgress = onProgress
+    const startedAt = performance.now()
     await client.separate(left, right)
+    performanceLog.record('splitter', duration, performance.now() - startedAt)
     result.value = client.getResult()
     if (result.value) await buildExports(source, result.value)
     isProcessing.value = false

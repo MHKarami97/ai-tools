@@ -16,6 +16,7 @@ import {
   type DownloadProgress,
 } from '@/lib/tts/modelDownloader'
 import type { SynthesisMode } from '@/workers/protocol'
+import { performanceLog } from '@/lib/system/performanceLog'
 
 const SAMPLE_RATE = 24000
 const VOICE_ID = 'custom'
@@ -144,10 +145,12 @@ function onVoiceChange(event: Event): void {
 function synthesize(): void {
   void guarded(async () => {
     await ensureEngine()
+    const startedAt = performance.now()
     sentenceProgress.value = null
     const result = await client.synthesizeText(text.value.trim(), VOICE_ID, mode.value, pace.value, (done, total) => {
       sentenceProgress.value = { done, total }
     })
+    performanceLog.record('tts', result.audio.length / SAMPLE_RATE, performance.now() - startedAt)
 
     const wav = encodeWav([result.audio], SAMPLE_RATE)
     const mp3 = await tryEncodeMp3(result.audio)

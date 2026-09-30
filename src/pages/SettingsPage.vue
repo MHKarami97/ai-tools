@@ -4,6 +4,7 @@ import PageStub from '@/components/PageStub.vue'
 import { formatBytes } from '@/lib/format'
 import { modelInventory, type ModelGroup } from '@/lib/storage/modelInventory'
 import { estimateStorage, requestPersistentStorage, type StorageEstimateInfo } from '@/lib/storageEstimate'
+import SystemInfoPanel from '@/components/SystemInfoPanel.vue'
 
 const groups = ref<ModelGroup[]>([])
 const storage = ref<StorageEstimateInfo | null>(null)
@@ -40,6 +41,7 @@ onMounted(refresh)
 <template>
   <PageStub title="تنظیمات" description="مدیریت مدل‌های دانلودشده و کش.">
     <div class="mt-4 space-y-4">
+      <SystemInfoPanel />
       <p v-if="loading" class="text-sm text-slate-500">در حال خواندن کش...</p>
       <p v-if="errorMessage" role="alert" class="rounded-lg bg-red-100 px-3 py-2 text-sm text-red-800">
         {{ errorMessage }}
