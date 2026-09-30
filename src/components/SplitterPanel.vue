@@ -31,9 +31,10 @@
       </div>
     </div>
 
+
     <div class="card">
       <div class="status-row">
-        <strong>وضعیت</strong>
+        <strong>{{ statusText }}</strong>
       </div>
       <div class="progress-track">
         <div class="progress-bar" :style="{ width: progressPercent + '%' }" />
@@ -45,10 +46,11 @@
       <button v-if="isProcessing" class="secondary-button" @click="cancelSeparation">لغو پردازش</button>
     </div>
 
-    <div v-if="result" class="card results-card">
+
+    <div v-if="exported" class="card results-card">
       <div class="section-heading">
         <strong>خروجی آماده است</strong>
-        <span class="quality-pill">WAV</span>
+        <span class="quality-pill">MP3 · {{ MP3_KBPS }} kbps</span>
       </div>
       <div class="result-list">
         <div class="result-row">
@@ -68,14 +70,17 @@
       </div>
     </div>
 
+
     <p class="footer-note">مدل در اولین اجرا دانلود می‌شود و در مرورگر کش می‌ماند.</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { SplitterClient, encodeWav, downloadBlob, baseName } from '@/lib/splitter/client'
+import { ref } from 'vue'
+import { SplitterClient, downloadBlob, baseName } from '@/lib/splitter/client'
 import type { SplitterProgressState, SplitterResult } from '@/lib/splitter/client'
+import { encodeMp3 } from '@/lib/audio/mp3Client'
+import { historyStore } from '@/lib/history/historyStore'
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const isDragging = ref(false)
@@ -86,10 +91,12 @@ const statusText = ref('آماده')
 const statusDetail = ref('فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.')
 const progressPercent = ref(0)
 const result = ref<SplitterResult | null>(null)
+const exported = ref<{ vocals: Blob; instrumental: Blob } | null>(null)
 
 let client: SplitterClient | null = null
 
 const MODEL_SIZE_MB = 172
+const MP3_KBPS = 192
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return 'حجم نامشخص'
@@ -128,6 +135,7 @@ function selectFile(file: File) {
   }
   selectedFile.value = file
   result.value = null
+  exported.value = null
   fileMeta.value = { name: file.name, size: formatBytes(file.size) }
   statusText.value = 'آماده'
   statusDetail.value = 'فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.'
@@ -183,15 +191,34 @@ function onProgress(state: SplitterProgressState) {
   }
 }
 
+async function buildExports(source: File, data: SplitterResult): Promise<void> {
+  statusText.value = 'در حال تبدیل به MP3'
+  statusDetail.value = 'خروجی‌ها فشرده می‌شوند تا حجم کمتری داشته باشند…'
+  progressPercent.value = 100
+  const [vocals, instrumental] = await Promise.all([
+    encodeMp3([data.vocalsLeft, data.vocalsRight], data.sampleRate, MP3_KBPS),
+    encodeMp3([data.instrumentalLeft, data.instrumentalRight], data.sampleRate, MP3_KBPS),
+  ])
+  exported.value = { vocals, instrumental }
+  const name = baseName(source.name)
+  await historyStore.add({
+    kind: 'splitter',
+    sourceName: source.name,
+    outputs: [`${name}_vocals.mp3`, `${name}_instrumental.mp3`],
+  })
+}
+
 async function startSeparation() {
   if (!selectedFile.value || isProcessing.value) return
   isProcessing.value = true
   result.value = null
+  exported.value = null
   statusText.value = 'در حال خواندن فایل'
   statusDetail.value = 'فایل صوتی فقط در همین مرورگر خوانده می‌شود…'
   progressPercent.value = 2
   try {
-    const decoded = await readAudio(selectedFile.value)
+    const source = selectedFile.value
+    const decoded = await readAudio(source)
     const left = resampleChannel(decoded.left, decoded.sampleRate, 44100)
     const right = resampleChannel(decoded.right, decoded.sampleRate, 44100)
     const duration = left.length / 44100
@@ -202,13 +229,14 @@ async function startSeparation() {
     client.onProgress = onProgress
     await client.separate(left, right)
     result.value = client.getResult()
+    if (result.value) await buildExports(source, result.value)
     isProcessing.value = false
     statusText.value = 'تمام شد'
-    statusDetail.value = 'دو خروجی آمادهٔ دانلود هستند.'
+    statusDetail.value = 'دو خروجی MP3 آمادهٔ دانلود هستند.'
     progressPercent.value = 100
   } catch (error) {
     isProcessing.value = false
-    statusText.value = 'خطا در خواندن فایل'
+    statusText.value = 'خطا در پردازش فایل'
     statusDetail.value = (error as Error).message || 'فرمت فایل پشتیبانی نمی‌شود.'
     progressPercent.value = 0
   }
@@ -225,19 +253,8 @@ function cancelSeparation() {
 }
 
 function downloadResult(kind: 'vocals' | 'instrumental') {
-  if (!result.value || !selectedFile.value) return
-  const name = baseName(selectedFile.value.name)
-  if (kind === 'vocals') {
-    downloadBlob(
-      encodeWav(result.value.vocalsLeft, result.value.vocalsRight, result.value.sampleRate),
-      `${name}_vocals.wav`,
-    )
-  } else {
-    downloadBlob(
-      encodeWav(result.value.instrumentalLeft, result.value.instrumentalRight, result.value.sampleRate),
-      `${name}_instrumental.wav`,
-    )
-  }
+  if (!exported.value || !selectedFile.value) return
+  downloadBlob(exported.value[kind], `${baseName(selectedFile.value.name)}_${kind}.mp3`)
 }
 </script>
 
