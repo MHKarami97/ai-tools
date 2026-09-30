@@ -198,7 +198,7 @@ async function startSeparation() {
     statusText.value = 'در حال آماده‌سازی'
     statusDetail.value = `مدت زمان فایل: ${formatDuration(duration)} · مدل روی دستگاه شما اجرا می‌شود.`
     progressPercent.value = 5
-    client = new SplitterClient(new URL('@/workers/splitter.worker.ts', import.meta.url).href)
+    client = new SplitterClient()
     client.onProgress = onProgress
     await client.separate(left, right)
     result.value = client.getResult()

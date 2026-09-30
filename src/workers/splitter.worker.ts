@@ -4,7 +4,7 @@ import { cacheModel, getCachedModel, MODEL_CACHE_KEY } from '@/lib/splitter/mode
 import type { SplitterInput, SplitterMessage } from '@/lib/splitter/types'
 
 const MODEL_URL = CONSTANTS.DEFAULT_MODEL_URL
-ort.env.wasm.wasmPaths = new URL('ort/', self.location.href).href
+ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`
 ort.env.wasm.numThreads = 1
 ort.env.wasm.proxy = false
 

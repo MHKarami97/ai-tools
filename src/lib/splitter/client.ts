@@ -24,8 +24,6 @@ export class SplitterClient {
   private onProgressCallback: ((state: SplitterProgressState) => void) | null = null
   private result: SplitterResult | null = null
 
-  constructor(private workerUrl: string) {}
-
   set onProgress(cb: (state: SplitterProgressState) => void) {
     this.onProgressCallback = cb
   }
@@ -33,7 +31,7 @@ export class SplitterClient {
   async separate(left: Float32Array, right: Float32Array): Promise<SplitterResult> {
     this.abortController = new AbortController()
     this.result = null
-    this.worker = new Worker(this.workerUrl, { type: 'module' })
+    this.worker = new Worker(new URL('../../workers/splitter.worker.ts', import.meta.url), { type: 'module' })
     return new Promise((resolve, reject) => {
       const cleanup = () => {
         if (this.worker) {
