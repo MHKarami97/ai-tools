@@ -13,7 +13,7 @@ function toInt16(samples: Float32Array): Int16Array {
   return output
 }
 
-function copyBytes(chunk: ArrayBufferView): Uint8Array {
+function copyBytes(chunk: ArrayBufferView): Uint8Array<ArrayBuffer> {
   return new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength).slice()
 }
 
