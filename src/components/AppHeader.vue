@@ -5,7 +5,6 @@ import { useThemeStore } from '@/stores/theme'
 
 const themeStore = useThemeStore()
 const navItems = features.filter((feature) => feature.showInNav)
-const canInstall = pwaInstaller.canInstall
 </script>
 
 <template>
@@ -25,16 +24,6 @@ const canInstall = pwaInstaller.canInstall
           {{ item.label }}
         </RouterLink>
       </nav>
-      <button
-        v-if="canInstall"
-        type="button"
-        class="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white"
-        @click="pwaInstaller.install()"
-      >
-        <span aria-hidden="true">⬇</span>
-        <span class="hidden sm:inline"> نصب برنامه</span>
-        <span class="sr-only sm:hidden">نصب برنامه</span>
-      </button>
       <button
         type="button"
         class="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700"

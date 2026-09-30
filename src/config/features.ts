@@ -4,6 +4,7 @@ export interface Feature {
   readonly label: string
   readonly description: string
   readonly showInNav: boolean
+  readonly showInHome: boolean
   readonly load: () => Promise<unknown>
 }
 
@@ -13,7 +14,8 @@ export const features: readonly Feature[] = [
     name: 'home',
     label: 'خانه',
     description: 'نمای کلی و دسترسی سریع',
-    showInNav: true,
+    showInNav: false,
+    showInHome: false,
     load: () => import('@/pages/HomePage.vue'),
   },
   {
@@ -21,7 +23,8 @@ export const features: readonly Feature[] = [
     name: 'tts',
     label: 'تبدیل متن به گفتار',
     description: 'سنتز گفتار فارسی با کلون صدا، کاملاً در مرورگر',
-    showInNav: true,
+    showInNav: false,
+    showInHome: true,
     load: () => import('@/pages/TtsPage.vue'),
   },
   {
@@ -29,7 +32,8 @@ export const features: readonly Feature[] = [
     name: 'splitter',
     label: 'جداسازی صدا',
     description: 'جداسازی وکال و ابزارها از فایل صوتی',
-    showInNav: true,
+    showInNav: false,
+    showInHome: true,
     load: () => import('@/pages/SplitterPage.vue'),
   },
   {
@@ -37,8 +41,18 @@ export const features: readonly Feature[] = [
     name: 'settings',
     label: 'تنظیمات',
     description: 'مدیریت مدل‌ها و کش',
-    showInNav: true,
+    showInNav: false,
+    showInHome: false,
     load: () => import('@/pages/SettingsPage.vue'),
+  },
+  {
+    path: '/about',
+    name: 'about',
+    label: 'درباره',
+    description: 'درباره ما',
+    showInNav: false,
+    showInHome: false,
+    load: () => import('@/pages/AboutPage.vue'),
   },
   {
     path: '/offline',
@@ -46,6 +60,7 @@ export const features: readonly Feature[] = [
     label: 'آفلاین',
     description: 'راهنمای استفاده بدون اینترنت',
     showInNav: false,
+    showInHome: false,
     load: () => import('@/pages/OfflinePage.vue'),
   },
 ]

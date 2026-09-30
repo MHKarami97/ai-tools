@@ -6,7 +6,7 @@
         href="https://mhkarami97.ir"
         target="_blank"
         rel="noopener noreferrer"
-        class="underline hover:text-emerald-600"
+        class="hover:text-emerald-600"
         >محمدحسین کرمی · mhkarami97.ir</a
       >
     </p>
