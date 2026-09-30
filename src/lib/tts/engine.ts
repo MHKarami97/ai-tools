@@ -51,8 +51,8 @@ export interface EngineAssets {
   readonly decoder: ort.InferenceSession
   readonly weights: ReadonlyMap<string, NpyArray>
   readonly decoderInit: ReadonlyMap<string, NpyArray>
-  readonly sp: SimpleSentencePiece
-  readonly g2p: SimpleG2P
+  readonly sp: SentencePieceModel;
+  readonly g2p: OnnxG2P;
 }
 
 export interface TextSynthesis {
@@ -71,14 +71,6 @@ interface FlowResult {
   readonly latent: Float32Array
   readonly eos: number
   readonly offset: number
-}
-
-export interface SimpleSentencePiece {
-  encode: (text: string) => Promise<number[]>
-}
-
-export interface SimpleG2P {
-  convert: (text: string) => Promise<string>
 }
 
 type TensorConstructor = new (type: string, data: unknown, dims: readonly number[]) => ort.Tensor

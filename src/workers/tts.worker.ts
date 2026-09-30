@@ -1,72 +1,65 @@
-import { expose } from 'comlink'
-import { ort } from '@/lib/ort/runtime'
-import { loadNpz, type NpyArray } from '@/lib/npz'
-import { PocketTtsEngine, type EngineAssets, type EngineConstants, type TextSynthesis } from '@/lib/tts/engine'
-import type { SynthesisMode, VoiceReport } from './protocol'
+import { expose } from 'comlink';
+import { configureOrt, createSession, ort, type ExternalData } from '@/lib/ort/runtime';
+import { parseNpz, type NpyArray } from '@/lib/npz';
+import { getModelBlob } from '@/lib/tts/modelDownloader';
+import { OnnxG2P } from '@/lib/tts/g2p';
+import { SentencePieceModel } from '@/lib/tts/sentencepiece';
+import {
+  PocketTtsEngine,
+  type EngineAssets,
+  type EngineConstants,
+  type TextSynthesis,
+} from '@/lib/tts/engine';
+import type { SynthesisMode, VoiceReport } from '@/workers/protocol';
 
-interface ModelBundle {
-  readonly constants: EngineConstants
-  readonly flow: ort.InferenceSession
-  readonly encoder: ort.InferenceSession
-  readonly decoder: ort.InferenceSession
-  readonly weights: Map<string, NpyArray>
-  readonly decoderInit: Map<string, NpyArray>
+interface Manifest {
+  readonly constants: EngineConstants;
 }
 
-let engine: PocketTtsEngine | null = null
-let modelBundle: ModelBundle | null = null
+class CachedModelReader {
+  async bytes(name: string): Promise<Uint8Array> {
+    const blob = await getModelBlob(name);
+    if (!blob) {
+      throw new Error(`Model file is not in the cache: ${name}`);
+    }
+    return new Uint8Array(await blob.arrayBuffer());
+  }
 
-async function loadModel(progress?: (done: number, total: number) => void): Promise<void> {
-  if (modelBundle) return
-  const [constants, flow, encoder, decoder, weights, decoderInit] = await Promise.all([
-    fetch('/models/tts/constants.json').then((r) => r.json() as Promise<EngineConstants>),
-    ort.InferenceSession.create('/models/tts/flow.onnx'),
-    ort.InferenceSession.create('/models/tts/encoder.onnx'),
-    ort.InferenceSession.create('/models/tts/decoder.onnx'),
-    loadNpz('/models/tts/weights.npz', progress),
-    loadNpz('/models/tts/decode_state_init.npz'),
-  ])
-  const sp = await ort.InferenceSession.create('/models/tts/sp.onnx').then((session) => ({
-    encode: async (text: string) => {
-      const input = new ort.Tensor('string', [text], [1])
-      const { ids } = await session.run({ input })
-      return Array.from(ids.data as BigInt64Array).map((n) => Number(n))
-    },
-  }))
-  const g2p = await ort.InferenceSession.create('/models/tts/g2p.onnx').then((session) => ({
-    convert: async (text: string) => {
-      const input = new ort.Tensor('string', [text], [1])
-      const { phonemes } = await session.run({ input })
-      return (phonemes.data as string[])[0]
-    },
-  }))
-  modelBundle = { constants, flow, encoder, decoder, weights, decoderInit }
-  engine = new PocketTtsEngine({
-    constants,
-    flow,
-    encoder,
-    decoder,
-    weights,
-    decoderInit,
-    sp,
-    g2p,
-  })
+  async text(name: string): Promise<string> {
+    return new TextDecoder().decode(await this.bytes(name));
+  }
+
+  async npz(name: string): Promise<Map<string, NpyArray>> {
+    const bytes = await this.bytes(name);
+    return parseNpz(bytes.buffer as ArrayBuffer);
+  }
+
+  async session(name: string, dataName?: string): Promise<ort.InferenceSession> {
+    const model = await this.bytes(name);
+    const externalData: ExternalData | undefined = dataName
+      ? [{ path: dataName, data: await this.bytes(dataName) }]
+      : undefined;
+    return createSession(model, 'wasm', externalData);
+  }
 }
 
-const handlers = {
-  async init(progress?: (done: number, total: number) => void): Promise<void> {
-    await loadModel(progress)
-  },
+class TtsWorkerApi {
+  private readonly reader = new CachedModelReader();
+  private engine: PocketTtsEngine | null = null;
+  private loading: Promise<void> | null = null;
+
+  init(): Promise<void> {
+    this.loading ??= this.load();
+    return this.loading;
+  }
 
   async registerVoice(id: string, samples: Float32Array): Promise<VoiceReport> {
-    if (!engine) throw new Error('مدل بارگذاری نشده است')
-    return engine.registerVoice(id, samples)
-  },
+    return this.requireEngine().registerVoice(id, samples);
+  }
 
   async phonemize(text: string, mode: SynthesisMode): Promise<string> {
-    if (!engine) throw new Error('مدل بارگذاری نشده است')
-    return engine.phonemize(text, mode)
-  },
+    return this.requireEngine().phonemize(text, mode);
+  }
 
   async synthesizeText(
     text: string,
@@ -75,14 +68,49 @@ const handlers = {
     pace: number,
     onProgress?: (done: number, total: number) => void,
   ): Promise<TextSynthesis> {
-    if (!engine) throw new Error('مدل بارگذاری نشده است')
-    return engine.synthesizeText(text, voiceId, mode, pace, onProgress)
-  },
+    return this.requireEngine().synthesizeText(text, voiceId, mode, pace, onProgress);
+  }
 
   async synthesizePhonemes(phonemes: string, voiceId: string, pace: number): Promise<Float32Array> {
-    if (!engine) throw new Error('مدل بارگذاری نشده است')
-    return engine.synthesizePhonemes(phonemes, voiceId, pace)
-  },
+    return this.requireEngine().synthesizePhonemes(phonemes, voiceId, pace);
+  }
+
+  private requireEngine(): PocketTtsEngine {
+    if (!this.engine) {
+      throw new Error('TTS engine is not initialised. Call init() first.');
+    }
+    return this.engine;
+  }
+
+  private async load(): Promise<void> {
+    configureOrt();
+    const r = this.reader;
+
+    const manifest = JSON.parse(await r.text('manifest.json')) as Manifest;
+    const [flow, encoder, decoder, g2pEncoder, g2pDecoder, weights, decoderInit, tokenizer] =
+      await Promise.all([
+        r.session('flow_lm_step.onnx', 'flow_lm_step.onnx.data'),
+        r.session('mimi_encoder.onnx', 'mimi_encoder.onnx.data'),
+        r.session('mimi_decoder_step_kv.onnx', 'mimi_decoder_step_kv.onnx.data'),
+        r.session('g2p_encoder.onnx'),
+        r.session('g2p_decoder.onnx', 'g2p_decoder.onnx.data'),
+        r.npz('weights.npz'),
+        r.npz('decode_state_init.npz'),
+        r.bytes('tokenizer_ph.model'),
+      ]);
+
+    const assets: EngineAssets = {
+      constants: manifest.constants,
+      flow,
+      encoder,
+      decoder,
+      weights,
+      decoderInit,
+      sp: SentencePieceModel.parse(tokenizer.buffer as ArrayBuffer),
+      g2p: new OnnxG2P(g2pEncoder, g2pDecoder),
+    };
+    this.engine = new PocketTtsEngine(assets);
+  }
 }
 
-expose(handlers)
+expose(new TtsWorkerApi());
