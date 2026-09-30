@@ -1,21 +1,16 @@
-import { expose } from "comlink";
-import {
-  configureOrt,
-  createSession,
-  ort,
-  type ExternalData,
-} from "@/lib/ort/runtime";
-import { parseNpz, type NpyArray } from "@/lib/npz";
-import { getModelBlob } from "@/lib/tts/modelDownloader";
-import { OnnxG2P } from "@/lib/tts/g2p";
-import { SentencePieceModel } from "@/lib/tts/sentencepiece";
+import { expose } from 'comlink';
+import { configureOrt, createSession, ort, type ExternalData } from '@/lib/ort/runtime';
+import { parseNpz, type NpyArray } from '@/lib/npz';
+import { getModelBlob } from '@/lib/tts/modelDownloader';
+import { OnnxG2P } from '@/lib/tts/g2p';
+import { SentencePieceModel } from '@/lib/tts/sentencepiece';
 import {
   PocketTtsEngine,
   type EngineAssets,
   type EngineConstants,
   type TextSynthesis,
-} from "@/lib/tts/engine";
-import type { SynthesisMode, VoiceReport } from "@/workers/protocol";
+} from '@/lib/tts/engine';
+import type { SynthesisMode, VoiceReport } from '@/workers/protocol';
 
 interface Manifest {
   readonly constants: EngineConstants;
@@ -24,7 +19,9 @@ interface Manifest {
 class CachedModelReader {
   async bytes(name: string): Promise<Uint8Array> {
     const blob = await getModelBlob(name);
-    if (!blob) throw new Error(`Model file is not in the cache: ${name}`);
+    if (!blob) {
+      throw new Error(`Model file is not in the cache: ${name}`);
+    }
     return new Uint8Array(await blob.arrayBuffer());
   }
 
@@ -37,15 +34,12 @@ class CachedModelReader {
     return parseNpz(bytes.buffer as ArrayBuffer);
   }
 
-  async session(
-    name: string,
-    dataName?: string,
-  ): Promise<ort.InferenceSession> {
+  async session(name: string, dataName?: string): Promise<ort.InferenceSession> {
     const model = await this.bytes(name);
     const externalData: ExternalData | undefined = dataName
       ? [{ path: dataName, data: await this.bytes(dataName) }]
       : undefined;
-    return createSession(model, "wasm", externalData);
+    return createSession(model, 'wasm', externalData);
   }
 }
 
@@ -74,26 +68,17 @@ class TtsWorkerApi {
     pace: number,
     onProgress?: (done: number, total: number) => void,
   ): Promise<TextSynthesis> {
-    return this.requireEngine().synthesizeText(
-      text,
-      voiceId,
-      mode,
-      pace,
-      onProgress,
-    );
+    return this.requireEngine().synthesizeText(text, voiceId, mode, pace, onProgress);
   }
 
-  async synthesizePhonemes(
-    phonemes: string,
-    voiceId: string,
-    pace: number,
-  ): Promise<Float32Array> {
+  async synthesizePhonemes(phonemes: string, voiceId: string, pace: number): Promise<Float32Array> {
     return this.requireEngine().synthesizePhonemes(phonemes, voiceId, pace);
   }
 
   private requireEngine(): PocketTtsEngine {
-    if (!this.engine)
-      throw new Error("TTS engine is not initialised. Call init() first.");
+    if (!this.engine) {
+      throw new Error('TTS engine is not initialised. Call init() first.');
+    }
     return this.engine;
   }
 
@@ -101,33 +86,22 @@ class TtsWorkerApi {
     configureOrt();
     const r = this.reader;
 
-    const manifest = JSON.parse(await r.text("manifest.json")) as Manifest;
-    const [
-      flow,
-      encoder,
-      decoder,
-      g2pEncoder,
-      g2pDecoder,
-      weights,
-      decoderInit,
-      tokenizer,
-    ] = await Promise.all([
-      r.session("flow_lm_step.onnx", "flow_lm_step.onnx.data"),
-      r.session("mimi_encoder.onnx", "mimi_encoder.onnx.data"),
-      r.session("mimi_decoder_step_kv.onnx", "mimi_decoder_step_kv.onnx.data"),
-      r.session("g2p_encoder.onnx"),
-      r.session("g2p_decoder.onnx", "g2p_decoder.onnx.data"),
-      r.npz("weights.npz"),
-      r.npz("decode_state_init.npz"),
-      r.bytes("tokenizer_ph.model"),
-    ]);
+    const manifest = JSON.parse(await r.text('manifest.json')) as Manifest;
+    const [flow, encoder, decoder, g2pEncoder, g2pDecoder, weights, decoderInit, tokenizer] =
+      await Promise.all([
+        r.session('flow_lm_step.onnx', 'flow_lm_step.onnx.data'),
+        r.session('mimi_encoder.onnx', 'mimi_encoder.onnx.data'),
+        r.session('mimi_decoder_step_kv.onnx', 'mimi_decoder_step_kv.onnx.data'),
+        r.session('g2p_encoder.onnx'),
+        r.session('g2p_decoder.onnx', 'g2p_decoder.onnx.data'),
+        r.npz('weights.npz'),
+        r.npz('decode_state_init.npz'),
+        r.bytes('tokenizer_ph.model'),
+      ]);
 
-    const sessions = { flow, encoder, decoder, g2pEncoder, g2pDecoder };
+    const sessions = { flow, encoder, decoder, g2pEncoder, g2pDecoder }
     for (const [label, session] of Object.entries(sessions)) {
-      console.info(`[tts] ${label}`, {
-        inputs: session.inputNames,
-        outputs: session.outputNames,
-      });
+      console.info(`[tts] ${label}`, { inputs: session.inputNames, outputs: session.outputNames })
     }
 
     const assets: EngineAssets = {
