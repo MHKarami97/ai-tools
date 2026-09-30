@@ -73,6 +73,11 @@ async function fetchFile(
   const response = await fetch(file.url, { signal })
   if (!response.ok) throw new Error(`دانلود ${file.name} ناموفق بود: HTTP ${response.status}`)
 
+  const contentType = response.headers.get('content-type') ?? ''
+  if (contentType.includes('text/html')) {
+    throw new Error(`فایل ${file.name} روی سرور پیدا نشد (به‌جای آن صفحهٔ HTML برگشت).`)
+  }
+
   const length = Number(response.headers.get('content-length'))
   const total = Number.isFinite(length) && length > 0 ? length : null
 
