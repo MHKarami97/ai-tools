@@ -231,6 +231,7 @@ export class PocketTtsEngine {
       noise: new ort.Tensor('float32', noise, [1, ldim]),
       cache: new ort.Tensor('float32', cache, [layers, 2, capacity, heads, headSize]),
     })
+    console.info('[tts] flow outputs keys', Object.keys(output))
     const newKv = (output.new_kv ?? output.newkv).data as Float32Array
     const steps = output.newkv.dims[2]
     const rowSize = steps * heads * headSize

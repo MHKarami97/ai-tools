@@ -101,7 +101,10 @@ class TtsWorkerApi {
 
     const sessions = { flow, encoder, decoder, g2pEncoder, g2pDecoder }
     for (const [label, session] of Object.entries(sessions)) {
-      console.info(`[tts] ${label}`, { inputs: session.inputNames, outputs: session.outputNames })
+      console.info(`[tts] ${label}`, {
+        inputs: session.inputNames,
+        outputs: session.outputNames,
+      })
     }
 
     const assets: EngineAssets = {
