@@ -63,7 +63,7 @@ function revokeOutputs(): void {
 async function tryEncodeMp3(samples: Float32Array): Promise<Blob | null> {
   try {
     return await encodeMp3([samples], SAMPLE_RATE, MP3_KBPS)
-  } catch {
+  } catch (error) {
     console.error(error)
     return null
   }
