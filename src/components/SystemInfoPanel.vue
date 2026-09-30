@@ -46,11 +46,11 @@ onMounted(async () => {
 
     <dl class="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 sm:gap-x-6 sm:gap-y-2.5">
       <div class="flex items-baseline justify-between border-b border-slate-100 pb-1.5 dark:border-slate-800">
-        <dt class="text-slate-500 dark:text-slate-400">هستهٔ پردازنده (منطقی)</dt>
+        <dt class="text-slate-500 dark:text-slate-400">هسته پردازنده (منطقی)</dt>
         <dd dir="ltr" class="font-medium">{{ report.cores ?? 'نامشخص' }}</dd>
       </div>
       <div class="flex items-baseline justify-between border-b border-slate-100 pb-1.5 dark:border-slate-800">
-        <dt class="text-slate-500 dark:text-slate-400">حافظهٔ تقریبی</dt>
+        <dt class="text-slate-500 dark:text-slate-400">حافظه تقریبی</dt>
         <dd dir="ltr" class="font-medium">
           {{ report.memoryGb ? report.memoryGb + ' GB' : 'گزارش نمی‌شود' }}
         </dd>
@@ -143,7 +143,7 @@ onMounted(async () => {
         <li class="flex gap-2">
           <span class="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-amber-200 font-bold text-amber-800 dark:bg-amber-800 dark:text-amber-200">3</span>
           <span>
-            صفحهٔ 
+            صفحه 
             <code class="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs dark:bg-amber-900/50">chrome://gpu</code>
             را بررسی کنید. اگر «disabled via blocklist» بود، پرچم
             <code class="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-xs dark:bg-amber-900/50">chrome://flags/#enable-unsafe-webgpu</code>

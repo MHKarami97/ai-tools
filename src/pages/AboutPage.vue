@@ -88,14 +88,14 @@ import { RouterLink } from 'vue-router'
 
       <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm dark:from-slate-800/50 dark:to-slate-900 dark:border-slate-800 sm:p-8">
         <h2 class="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
-          دربارهٔ توسعه‌دهنده
+          درباره توسعه‌دهنده
         </h2>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
           <div class="flex-1">
             <p class="mb-3 text-sm leading-7 text-slate-700 dark:text-slate-300 sm:text-base">
               این پروژه توسط 
               <strong class="font-semibold text-slate-900 dark:text-slate-100">محمدحسین کرمی</strong>
-              توسعه داده شده. من یه توسعه‌دهندهٔ نرم‌افزار هستم.
+              توسعه داده شده. من یه توسعه‌دهنده نرم‌افزار هستم.
             </p>
             <p class="text-sm leading-7 text-slate-700 dark:text-slate-300 sm:text-base">
               علاقه‌مند به تاریخ، کتاب، سفر و برنامه‌نویسی. همیشه در حال یادگیری و ساختن پروژه‌های جدید.

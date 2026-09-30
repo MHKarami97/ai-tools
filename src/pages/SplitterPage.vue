@@ -5,5 +5,5 @@ import SplitterPanel from '@/components/SplitterPanel.vue'
 
 <template>
   <SplitterPanel />
-  <HistoryList kind="splitter" title="تاریخچهٔ جداسازی" source-label="فایل اصلی" />
+  <HistoryList kind="splitter" title="تاریخچه جداسازی" source-label="فایل اصلی" />
 </template>

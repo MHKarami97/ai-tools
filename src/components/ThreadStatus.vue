@@ -10,7 +10,7 @@ const statusText = computed(() => {
   if (!r.crossOriginIsolated || !r.sharedArrayBuffer) {
     return 'چندنخی غیرفعال است. صفحه روی HTTPS یا localhost نیست یا هدرهای COOP/COEP تنظیم نشده‌اند.'
   }
-  return `چندنخی فعال است: ${r.numThreads} نخ (از ${r.hardwareConcurrency ?? 'نامشخص'} هستهٔ منطقی)`
+  return `چندنخی فعال است: ${r.numThreads} نخ (از ${r.hardwareConcurrency ?? 'نامشخص'} هسته منطقی)`
 })
 
 onMounted(() => {

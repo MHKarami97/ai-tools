@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
     <header>
       <h1 class="text-2xl font-bold">تبدیل متن به گفتار فارسی</h1>
       <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-        همهٔ پردازش‌ها داخل مرورگر و آفلاین انجام می‌شود. مدل فقط بار اول دانلود می‌شود.
+        همه پردازش‌ها داخل مرورگر و آفلاین انجام می‌شود. مدل فقط بار اول دانلود می‌شود.
       </p>
     </header>
 
@@ -303,5 +303,5 @@ onBeforeUnmount(() => {
     </div>
   </section>
 
-  <HistoryList kind="tts" title="تاریخچهٔ تبدیل متن به گفتار" source-label="متن" />
+  <HistoryList kind="tts" title="تاریخچه تبدیل متن به گفتار" source-label="متن" />
 </template>

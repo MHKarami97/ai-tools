@@ -44,7 +44,7 @@ watch(() => historyStore.version.value, refresh)
       <li v-for="entry in entries" :key="entry.id" class="space-y-1 py-3 text-sm">
         <div class="flex flex-wrap items-start justify-between gap-2">
           <p class="break-all">
-            <span class="text-slate-500">{{ sourceLabel }}:</span>
+            <span class="text-slate-500">{{ sourceLabel }} : </span>
             <span dir="auto"> {{ entry.sourceName }}</span>
           </p>
           <button type="button" class="text-xs text-red-600" @click="historyStore.remove(entry.id)">حذف</button>

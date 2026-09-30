@@ -119,7 +119,7 @@ const selectedFile = ref<File | null>(null);
 const fileMeta = ref<{ name: string; size: string } | null>(null);
 const isProcessing = ref(false);
 const statusText = ref("آماده");
-const statusDetail = ref("فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.");
+const statusDetail = ref("فایل انتخاب شد. برای شروع روی دکمه زیر بزنید.");
 const progressPercent = ref(0);
 const result = ref<SplitterResult | null>(null);
 const exported = ref<{ vocals: Blob; instrumental: Blob; ext: 'mp3' | 'wav' } | null>(null)
@@ -174,7 +174,7 @@ function selectFile(file: File) {
   exported.value = null;
   fileMeta.value = { name: file.name, size: formatBytes(file.size) };
   statusText.value = "آماده";
-  statusDetail.value = "فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.";
+  statusDetail.value = "فایل انتخاب شد. برای شروع روی دکمه زیر بزنید.";
   progressPercent.value = 0;
 }
 
@@ -236,7 +236,7 @@ function onProgress(state: SplitterProgressState) {
       progressPercent.value = 100;
     } else if (typeof state.progress === "number") {
       statusText.value = "در حال جداسازی";
-      statusDetail.value = `قطعهٔ ${state.currentSegment ?? "?"} از ${state.totalSegments ?? "?"}`;
+      statusDetail.value = `قطعه ${state.currentSegment ?? "?"} از ${state.totalSegments ?? "?"}`;
       progressPercent.value = state.progress * 100;
     }
   }
@@ -307,7 +307,7 @@ async function startSeparation() {
     if (result.value) await buildExports(source, result.value);
     isProcessing.value = false;
     statusText.value = "تمام شد";
-    statusDetail.value = "دو خروجی MP3 آمادهٔ دانلود هستند.";
+    statusDetail.value = "دو خروجی MP3 آماده دانلود هستند.";
     progressPercent.value = 100;
   } catch (error) {
     isProcessing.value = false;

@@ -48,10 +48,10 @@ onMounted(refresh)
 
 <template>
   <div class="mt-6 space-y-4">
-    <h2 class="font-semibold">آزمایش لایهٔ کش مدل</h2>
+    <h2 class="font-semibold">آزمایش لایه کش مدل</h2>
     <div class="flex flex-wrap gap-2">
       <button type="button" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white" @click="save">
-        ذخیرهٔ مدل تستی (۱ مگابایت)
+        ذخیره مدل تستی (۱ مگابایت)
       </button>
       <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm dark:border-slate-700" @click="load">
         بارگذاری

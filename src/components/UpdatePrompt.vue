@@ -10,7 +10,7 @@ const needRefresh = pwaUpdater.needRefresh
     role="alert"
     class="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-600 bg-white p-4 text-sm shadow-lg dark:bg-slate-900"
   >
-    <span>نسخهٔ جدید سایت آماده است. برای استفاده از آن، صفحه را بروزرسانی کنید.</span>
+    <span>نسخه جدید سایت آماده است. برای استفاده از آن، صفحه را بروزرسانی کنید.</span>
     <span class="flex gap-2">
       <button type="button" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-white" @click="pwaUpdater.apply()">
         بروزرسانی

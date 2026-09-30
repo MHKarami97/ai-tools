@@ -10,7 +10,7 @@ const quickActions = features.filter(
   <section>
     <h1 class="mb-2 text-2xl font-bold">ابزارهای هوش مصنوعی آفلاین</h1>
     <p class="mb-6 text-slate-600 dark:text-slate-400">
-      مدل‌ها فقط با درخواست شما دانلود می‌شوند و همهٔ پردازش‌ها در مرورگر خودتان
+      مدل‌ها فقط با درخواست شما دانلود می‌شوند و همه پردازش‌ها در مرورگر خودتان
       انجام می‌شود.
     </p>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
