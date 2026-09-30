@@ -269,12 +269,6 @@ onBeforeUnmount(() => {
       <p v-if="processingVoice" class="text-sm text-amber-700 dark:text-amber-400">
         در حال پردازش صدای مرجع… لطفاً صبر کنید تا کامل شود.
       </p>
-      <div v-if="task" class="space-y-1" role="status" aria-live="polite">
-        <div class="h-2 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
-          <div class="h-full bg-emerald-600 transition-all" :style="{ width: taskPercent + '%' }" />
-        </div>
-        <p class="text-xs text-slate-500">{{ task.label }} · {{ taskPercent }}%</p>
-      </div>
       <p v-if="hasVoice" class="text-sm text-emerald-700 dark:text-emerald-400">
         صدای ذخیره‌شده: <span dir="ltr">{{ voiceName || VOICE_ID }}</span>
       </p>
