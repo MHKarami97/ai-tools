@@ -59,6 +59,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  build: { minify: false },
   optimizeDeps: { exclude: ['onnxruntime-web'] },
   worker: { format: 'es' },
   server: { headers: crossOriginIsolationHeaders },

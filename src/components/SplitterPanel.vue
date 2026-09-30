@@ -24,13 +24,18 @@
         <div class="upload-icon">📁</div>
         <p class="drop-title">فایل ترانه را انتخاب کنید</p>
         <p class="drop-help">MP3، WAV، M4A، OGG</p>
-        <input ref="fileInput" type="file" accept="audio/*" @change="onFileChange" hidden />
+        <input
+          ref="fileInput"
+          type="file"
+          accept="audio/*"
+          @change="onFileChange"
+          hidden
+        />
       </div>
       <div v-if="fileMeta" class="file-meta">
         <strong>{{ fileMeta.name }}</strong> · {{ fileMeta.size }}
       </div>
     </div>
-
 
     <div class="card">
       <div class="status-row">
@@ -40,17 +45,26 @@
         <div class="progress-bar" :style="{ width: progressPercent + '%' }" />
       </div>
       <p class="status-detail">{{ statusDetail }}</p>
-      <button class="primary-button" :disabled="!selectedFile || isProcessing" @click="startSeparation">
+      <button
+        class="primary-button"
+        :disabled="!selectedFile || isProcessing"
+        @click="startSeparation"
+      >
         شروع جداسازی
       </button>
-      <button v-if="isProcessing" class="secondary-button" @click="cancelSeparation">لغو پردازش</button>
+      <button
+        v-if="isProcessing"
+        class="secondary-button"
+        @click="cancelSeparation"
+      >
+        لغو پردازش
+      </button>
     </div>
-
 
     <div v-if="exported" class="card results-card">
       <div class="section-heading">
         <strong>خروجی آماده است</strong>
-        <span class="quality-pill">MP3 · {{ MP3_KBPS }} kbps</span>
+        <span class="quality-pill">{{ exported?.ext === 'wav' ? 'WAV' : `MP3 · ${MP3_KBPS} kbps` }}</span>
       </div>
       <div class="result-list">
         <div class="result-row">
@@ -58,206 +72,268 @@
             <strong>صدای خواننده</strong>
             <span>Vocal stem</span>
           </div>
-          <button class="download-button" @click="downloadResult('vocals')">دانلود</button>
+          <button class="download-button" @click="downloadResult('vocals')">
+            دانلود
+          </button>
         </div>
         <div class="result-row">
           <div>
             <strong>موسیقی بی‌کلام</strong>
             <span>Instrumental stem</span>
           </div>
-          <button class="download-button" @click="downloadResult('instrumental')">دانلود</button>
+          <button
+            class="download-button"
+            @click="downloadResult('instrumental')"
+          >
+            دانلود
+          </button>
         </div>
       </div>
     </div>
 
-
-    <p class="footer-note">مدل در اولین اجرا دانلود می‌شود و در مرورگر کش می‌ماند.</p>
+    <p class="footer-note">
+      مدل در اولین اجرا دانلود می‌شود و در مرورگر کش می‌ماند.
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { SplitterClient, downloadBlob, baseName } from '@/lib/splitter/client'
-import type { SplitterProgressState, SplitterResult } from '@/lib/splitter/client'
-import { encodeMp3 } from '@/lib/audio/mp3Client'
-import { historyStore } from '@/lib/history/historyStore'
-import { performanceLog } from '@/lib/system/performanceLog'
+import { ref } from "vue";
+import {
+  SplitterClient,
+  downloadBlob,
+  baseName,
+  encodeWav,
+} from "@/lib/splitter/client";
+import type {
+  SplitterProgressState,
+  SplitterResult,
+} from "@/lib/splitter/client";
+import { encodeMp3 } from "@/lib/audio/mp3Client";
+import { historyStore } from "@/lib/history/historyStore";
+import { performanceLog } from "@/lib/system/performanceLog";
 
-const fileInput = ref<HTMLInputElement | null>(null)
-const isDragging = ref(false)
-const selectedFile = ref<File | null>(null)
-const fileMeta = ref<{ name: string; size: string } | null>(null)
-const isProcessing = ref(false)
-const statusText = ref('آماده')
-const statusDetail = ref('فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.')
-const progressPercent = ref(0)
-const result = ref<SplitterResult | null>(null)
-const exported = ref<{ vocals: Blob; instrumental: Blob } | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null);
+const isDragging = ref(false);
+const selectedFile = ref<File | null>(null);
+const fileMeta = ref<{ name: string; size: string } | null>(null);
+const isProcessing = ref(false);
+const statusText = ref("آماده");
+const statusDetail = ref("فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.");
+const progressPercent = ref(0);
+const result = ref<SplitterResult | null>(null);
+const exported = ref<{ vocals: Blob; instrumental: Blob; ext: 'mp3' | 'wav' } | null>(null)
 
-let client: SplitterClient | null = null
+let client: SplitterClient | null = null;
 
-const MODEL_SIZE_MB = 172
-const MP3_KBPS = 192
+const MODEL_SIZE_MB = 172;
+const MP3_KBPS = 192;
 
 function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return 'حجم نامشخص'
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} کیلوبایت`
-  return `${(bytes / 1024 / 1024).toFixed(1)} مگابایت`
+  if (!Number.isFinite(bytes) || bytes <= 0) return "حجم نامشخص";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} کیلوبایت`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} مگابایت`;
 }
 
 function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds)) return ''
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.round(seconds % 60).toString().padStart(2, '0')
-  return `${mins}:${secs}`
+  if (!Number.isFinite(seconds)) return "";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${mins}:${secs}`;
 }
 
 function triggerFileInput() {
-  fileInput.value?.click()
+  fileInput.value?.click();
 }
 
 function onFileChange(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (file) selectFile(file)
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (file) selectFile(file);
 }
 
 function onDrop(event: DragEvent) {
-  isDragging.value = false
-  const file = event.dataTransfer?.files[0]
-  if (file) selectFile(file)
+  isDragging.value = false;
+  const file = event.dataTransfer?.files[0];
+  if (file) selectFile(file);
 }
 
 function selectFile(file: File) {
-  if (!file.type.startsWith('audio/') && !/\.(mp3|wav|m4a|ogg|flac)$/i.test(file.name)) {
-    statusText.value = 'فایل نامعتبر'
-    statusDetail.value = 'لطفاً یک فایل صوتی قابل‌پخش انتخاب کنید.'
-    progressPercent.value = 0
-    return
+  if (
+    !file.type.startsWith("audio/") &&
+    !/\.(mp3|wav|m4a|ogg|flac)$/i.test(file.name)
+  ) {
+    statusText.value = "فایل نامعتبر";
+    statusDetail.value = "لطفاً یک فایل صوتی قابل‌پخش انتخاب کنید.";
+    progressPercent.value = 0;
+    return;
   }
-  selectedFile.value = file
-  result.value = null
-  exported.value = null
-  fileMeta.value = { name: file.name, size: formatBytes(file.size) }
-  statusText.value = 'آماده'
-  statusDetail.value = 'فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.'
-  progressPercent.value = 0
+  selectedFile.value = file;
+  result.value = null;
+  exported.value = null;
+  fileMeta.value = { name: file.name, size: formatBytes(file.size) };
+  statusText.value = "آماده";
+  statusDetail.value = "فایل انتخاب شد. برای شروع روی دکمهٔ زیر بزنید.";
+  progressPercent.value = 0;
 }
 
-async function readAudio(file: File): Promise<{ left: Float32Array; right: Float32Array; sampleRate: number; length: number }> {
-  const context = new AudioContext()
+async function readAudio(file: File): Promise<{
+  left: Float32Array;
+  right: Float32Array;
+  sampleRate: number;
+  length: number;
+}> {
+  const context = new AudioContext();
   try {
-    const decoded = await context.decodeAudioData(await file.arrayBuffer())
-    const length = decoded.length
-    const left = decoded.getChannelData(0).slice()
-    const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1).slice() : left.slice()
-    return { left, right, sampleRate: decoded.sampleRate, length }
+    const decoded = await context.decodeAudioData(await file.arrayBuffer());
+    const length = decoded.length;
+    const left = decoded.getChannelData(0).slice();
+    const right =
+      decoded.numberOfChannels > 1
+        ? decoded.getChannelData(1).slice()
+        : left.slice();
+    return { left, right, sampleRate: decoded.sampleRate, length };
   } finally {
-    await context.close()
+    await context.close();
   }
 }
 
-function resampleChannel(input: Float32Array, fromRate: number, toRate: number): Float32Array {
-  if (fromRate === toRate) return input
-  const outputLength = Math.max(1, Math.round((input.length * toRate) / fromRate))
-  const output = new Float32Array(outputLength)
-  const ratio = fromRate / toRate
+function resampleChannel(
+  input: Float32Array,
+  fromRate: number,
+  toRate: number,
+): Float32Array {
+  if (fromRate === toRate) return input;
+  const outputLength = Math.max(
+    1,
+    Math.round((input.length * toRate) / fromRate),
+  );
+  const output = new Float32Array(outputLength);
+  const ratio = fromRate / toRate;
   for (let i = 0; i < outputLength; i += 1) {
-    const position = i * ratio
-    const index = Math.floor(position)
-    const fraction = position - index
-    const a = input[Math.min(index, input.length - 1)] || 0
-    const b = input[Math.min(index + 1, input.length - 1)] || a
-    output[i] = a + (b - a) * fraction
+    const position = i * ratio;
+    const index = Math.floor(position);
+    const fraction = position - index;
+    const a = input[Math.min(index, input.length - 1)] || 0;
+    const b = input[Math.min(index + 1, input.length - 1)] || a;
+    output[i] = a + (b - a) * fraction;
   }
-  return output
+  return output;
 }
 
 function onProgress(state: SplitterProgressState) {
-  if (state.type === 'model') {
-    const loaded = state.loaded || 0
-    const total = state.total || MODEL_SIZE_MB * 1024 * 1024
-    statusText.value = 'در حال دانلود مدل'
-    statusDetail.value = `${formatBytes(loaded)} از حدود ${formatBytes(total)} · این مرحله فقط بار اول انجام می‌شود.`
-    progressPercent.value = (loaded / total) * 100
-  } else if (state.type === 'process') {
+  if (state.type === "model") {
+    const loaded = state.loaded || 0;
+    const total = state.total || MODEL_SIZE_MB * 1024 * 1024;
+    statusText.value = "در حال دانلود مدل";
+    statusDetail.value = `${formatBytes(loaded)} از حدود ${formatBytes(total)} · این مرحله فقط بار اول انجام می‌شود.`;
+    progressPercent.value = (loaded / total) * 100;
+  } else if (state.type === "process") {
     if (state.message) {
-      statusText.value = 'در حال آماده‌سازی'
-      statusDetail.value = state.message
-      progressPercent.value = 100
-    } else if (typeof state.progress === 'number') {
-      statusText.value = 'در حال جداسازی'
-      statusDetail.value = `قطعهٔ ${state.currentSegment ?? '?'} از ${state.totalSegments ?? '?'}`
-      progressPercent.value = state.progress * 100
+      statusText.value = "در حال آماده‌سازی";
+      statusDetail.value = state.message;
+      progressPercent.value = 100;
+    } else if (typeof state.progress === "number") {
+      statusText.value = "در حال جداسازی";
+      statusDetail.value = `قطعهٔ ${state.currentSegment ?? "?"} از ${state.totalSegments ?? "?"}`;
+      progressPercent.value = state.progress * 100;
     }
   }
 }
 
 async function buildExports(source: File, data: SplitterResult): Promise<void> {
-  statusText.value = 'در حال تبدیل به MP3'
-  statusDetail.value = 'خروجی‌ها فشرده می‌شوند تا حجم کمتری داشته باشند…'
-  progressPercent.value = 100
-  const [vocals, instrumental] = await Promise.all([
-    encodeMp3([data.vocalsLeft, data.vocalsRight], data.sampleRate, MP3_KBPS),
-    encodeMp3([data.instrumentalLeft, data.instrumentalRight], data.sampleRate, MP3_KBPS),
-  ])
-  exported.value = { vocals, instrumental }
-  const name = baseName(source.name)
+  statusText.value = "در حال تبدیل به MP3";
+  statusDetail.value = "خروجی‌ها فشرده می‌شوند تا حجم کمتری داشته باشند…";
+  progressPercent.value = 100;
+
+  let vocals: Blob;
+  let instrumental: Blob;
+  let ext: "mp3" | "wav" = "mp3";
+  try {
+    const blobs = await Promise.all([
+      encodeMp3([data.vocalsLeft, data.vocalsRight], data.sampleRate, MP3_KBPS),
+      encodeMp3(
+        [data.instrumentalLeft, data.instrumentalRight],
+        data.sampleRate,
+        MP3_KBPS,
+      ),
+    ]);
+    vocals = blobs[0];
+    instrumental = blobs[1];
+  } catch (error) {
+    console.error("MP3 encoding failed, falling back to WAV", error);
+    ext = "wav";
+    vocals = encodeWav(data.vocalsLeft, data.vocalsRight, data.sampleRate);
+    instrumental = encodeWav(
+      data.instrumentalLeft,
+      data.instrumentalRight,
+      data.sampleRate,
+    );
+  }
+
+  exported.value = { vocals, instrumental, ext };
+  const name = baseName(source.name);
   await historyStore.add({
-    kind: 'splitter',
+    kind: "splitter",
     sourceName: source.name,
-    outputs: [`${name}_vocals.mp3`, `${name}_instrumental.mp3`],
-  })
+    outputs: [`${name}_vocals.${ext}`, `${name}_instrumental.${ext}`],
+  });
 }
 
 async function startSeparation() {
-  if (!selectedFile.value || isProcessing.value) return
-  isProcessing.value = true
-  result.value = null
-  exported.value = null
-  statusText.value = 'در حال خواندن فایل'
-  statusDetail.value = 'فایل صوتی فقط در همین مرورگر خوانده می‌شود…'
-  progressPercent.value = 2
+  if (!selectedFile.value || isProcessing.value) return;
+  isProcessing.value = true;
+  result.value = null;
+  exported.value = null;
+  statusText.value = "در حال خواندن فایل";
+  statusDetail.value = "فایل صوتی فقط در همین مرورگر خوانده می‌شود…";
+  progressPercent.value = 2;
   try {
-    const source = selectedFile.value
-    const decoded = await readAudio(source)
-    const left = resampleChannel(decoded.left, decoded.sampleRate, 44100)
-    const right = resampleChannel(decoded.right, decoded.sampleRate, 44100)
-    const duration = left.length / 44100
-    statusText.value = 'در حال آماده‌سازی'
-    statusDetail.value = `مدت زمان فایل: ${formatDuration(duration)} · مدل روی دستگاه شما اجرا می‌شود.`
-    progressPercent.value = 5
-    client = new SplitterClient()
-    client.onProgress = onProgress
-    const startedAt = performance.now()
-    await client.separate(left, right)
-    performanceLog.record('splitter', duration, performance.now() - startedAt)
-    result.value = client.getResult()
-    if (result.value) await buildExports(source, result.value)
-    isProcessing.value = false
-    statusText.value = 'تمام شد'
-    statusDetail.value = 'دو خروجی MP3 آمادهٔ دانلود هستند.'
-    progressPercent.value = 100
+    const source = selectedFile.value;
+    const decoded = await readAudio(source);
+    const left = resampleChannel(decoded.left, decoded.sampleRate, 44100);
+    const right = resampleChannel(decoded.right, decoded.sampleRate, 44100);
+    const duration = left.length / 44100;
+    statusText.value = "در حال آماده‌سازی";
+    statusDetail.value = `مدت زمان فایل: ${formatDuration(duration)} · مدل روی دستگاه شما اجرا می‌شود.`;
+    progressPercent.value = 5;
+    client = new SplitterClient();
+    client.onProgress = onProgress;
+    const startedAt = performance.now();
+    await client.separate(left, right);
+    performanceLog.record("splitter", duration, performance.now() - startedAt);
+    result.value = client.getResult();
+    if (result.value) await buildExports(source, result.value);
+    isProcessing.value = false;
+    statusText.value = "تمام شد";
+    statusDetail.value = "دو خروجی MP3 آمادهٔ دانلود هستند.";
+    progressPercent.value = 100;
   } catch (error) {
-    isProcessing.value = false
-    statusText.value = 'خطا در پردازش فایل'
-    statusDetail.value = (error as Error).message || 'فرمت فایل پشتیبانی نمی‌شود.'
-    progressPercent.value = 0
+    isProcessing.value = false;
+    statusText.value = "خطا در پردازش فایل";
+    statusDetail.value =
+      (error as Error).message || "فرمت فایل پشتیبانی نمی‌شود.";
+    progressPercent.value = 0;
   }
 }
 
 function cancelSeparation() {
-  if (!isProcessing.value) return
-  isProcessing.value = false
-  client?.cancel()
-  client = null
-  statusText.value = 'لغو شد'
-  statusDetail.value = 'می‌توانید دوباره پردازش را شروع کنید.'
-  progressPercent.value = 0
+  if (!isProcessing.value) return;
+  isProcessing.value = false;
+  client?.cancel();
+  client = null;
+  statusText.value = "لغو شد";
+  statusDetail.value = "می‌توانید دوباره پردازش را شروع کنید.";
+  progressPercent.value = 0;
 }
 
-function downloadResult(kind: 'vocals' | 'instrumental') {
-  if (!exported.value || !selectedFile.value) return
-  downloadBlob(exported.value[kind], `${baseName(selectedFile.value.name)}_${kind}.mp3`)
+function downloadResult(kind: "vocals" | "instrumental") {
+  if (!exported.value || !selectedFile.value) return;
+  downloadBlob(
+    exported.value[kind],
+    `${baseName(selectedFile.value.name)}_${kind}.${exported.value.ext}`,
+  );
 }
 </script>
 
@@ -293,7 +369,9 @@ function downloadResult(kind: 'vocals' | 'instrumental') {
   font-weight: 800;
   letter-spacing: 0.08em;
 }
-h1, h2, p {
+h1,
+h2,
+p {
   margin-top: 0;
 }
 h1 {
@@ -324,12 +402,20 @@ h1 {
   padding: 16px;
   text-align: center;
   cursor: pointer;
-  background: linear-gradient(135deg, rgba(99, 214, 179, 0.08), rgba(87, 121, 198, 0.08));
+  background: linear-gradient(
+    135deg,
+    rgba(99, 214, 179, 0.08),
+    rgba(87, 121, 198, 0.08)
+  );
   border: 1px dashed rgba(99, 214, 179, 0.58);
   border-radius: 13px;
-  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s;
 }
-.file-drop:hover, .file-drop.is-dragging {
+.file-drop:hover,
+.file-drop.is-dragging {
   background: rgba(99, 214, 179, 0.14);
   border-color: #63d6b3;
   transform: translateY(-1px);
@@ -364,7 +450,9 @@ h1 {
 .file-meta strong {
   color: #e7eefc;
 }
-.status-row, .section-heading, .result-row {
+.status-row,
+.section-heading,
+.result-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -399,7 +487,8 @@ h1 {
   font-size: 10px;
   line-height: 1.55;
 }
-.primary-button, .secondary-button {
+.primary-button,
+.secondary-button {
   width: 100%;
   padding: 11px 14px;
   border-radius: 10px;
@@ -407,7 +496,10 @@ h1 {
   font-weight: 700;
   border: 0;
   cursor: pointer;
-  transition: filter 0.2s, transform 0.2s, opacity 0.2s;
+  transition:
+    filter 0.2s,
+    transform 0.2s,
+    opacity 0.2s;
 }
 .primary-button {
   color: #061a18;
