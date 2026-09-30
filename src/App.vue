@@ -2,6 +2,7 @@
 import AppFooter from '@/components/AppFooter.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
+import UpdatePrompt from '@/components/UpdatePrompt.vue'
 </script>
 
 <template>
@@ -12,5 +13,6 @@ import OfflineBanner from '@/components/OfflineBanner.vue'
       <RouterView />
     </main>
     <AppFooter />
+    <UpdatePrompt />
   </div>
 </template>
