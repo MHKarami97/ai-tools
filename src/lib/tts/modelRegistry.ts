@@ -4,7 +4,9 @@ export interface ModelFile {
 }
 
 const ONNX_REPO = 'Nimaone/pocket-tts-farsi-v2-onnx'
-const ONNX_BRANCH = 'main'
+const TOKENIZER_REPO = 'mehdi-hf/pocket-tts-farsi-v2'
+const BRANCH = 'main'
+const TOKENIZER_FILE_NAME = 'tokenizer_ph.model'
 
 const ONNX_FILE_NAMES: readonly string[] = [
   'manifest.json',
@@ -21,17 +23,11 @@ const ONNX_FILE_NAMES: readonly string[] = [
   'decode_state_init.npz',
 ]
 
-const TOKENIZER_FILE_NAME = 'tokenizer_ph.model'
-
-function remoteUrl(name: string): string {
-  return `https://huggingface.co/${ONNX_REPO}/resolve/${ONNX_BRANCH}/${name}`
-}
-
-function sameOriginUrl(name: string): string {
-  return `${import.meta.env.BASE_URL}models/${name}`
+function remoteUrl(repo: string, name: string): string {
+  return `https://huggingface.co/${repo}/resolve/${BRANCH}/${name}`
 }
 
 export const MODEL_FILES: readonly ModelFile[] = [
-  ...ONNX_FILE_NAMES.map((name) => ({ name, url: remoteUrl(name) })),
-  { name: TOKENIZER_FILE_NAME, url: sameOriginUrl(TOKENIZER_FILE_NAME) },
+  ...ONNX_FILE_NAMES.map((name) => ({ name, url: remoteUrl(ONNX_REPO, name) })),
+  { name: TOKENIZER_FILE_NAME, url: remoteUrl(TOKENIZER_REPO, TOKENIZER_FILE_NAME) },
 ]
