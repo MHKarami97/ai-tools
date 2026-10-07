@@ -76,8 +76,8 @@
       </div>
 
       <p class="option-note">
-        هر استم جداگانه بررسی می‌شود. اگر هر دو را (حذف سکوت) کنید، طول دو فایل با
-        هم فرق می‌کند و روی هم همگام نخواهند بود.
+        هر استم جداگانه بررسی می‌شود. اگر هر دو را (حذف سکوت) کنید، طول دو فایل
+        با هم فرق می‌کند و روی هم همگام نخواهند بود.
       </p>
     </div>
 
@@ -151,31 +151,61 @@
       </button>
     </div>
 
-    <div v-if="exported && vocalStem" class="card video-intro">
-      <div class="section-heading">
-        <strong>ویدئوی متن آهنگ (ریلز)</strong>
-        <span class="quality-pill">جدید</span>
-      </div>
-      <p class="option-note">
-        از همین صدای خواننده، یک ویدئوی عمودی با متن همگام می‌سازید. ویدئو از
-        صدای خروجی بالا (با تنظیمات حذف سکوت) ساخته می‌شود.
-      </p>
-      <button
-        v-if="!showVideoTool"
-        class="primary-button"
-        @click="showVideoTool = true"
-      >
-        باز کردن ابزار ساخت ویدئو
-      </button>
-    </div>
+    <section id="lyric-video" class="video-section">
+      <template v-if="exported && vocalStem">
+        <div class="card video-intro">
+          <div class="section-heading">
+            <strong>ویدئوی متن آهنگ (ریلز)</strong>
+            <span class="quality-pill">جدید</span>
+          </div>
+          <p class="option-note">
+            از همین صدای خواننده، یک ویدئوی عمودی با متن همگام می‌سازید. ویدئو
+            از صدای خروجی بالا (با تنظیمات حذف سکوت) ساخته می‌شود.
+          </p>
+          <button
+            v-if="!showVideoTool"
+            class="primary-button"
+            @click="showVideoTool = true"
+          >
+            باز کردن ابزار ساخت ویدئو
+          </button>
+        </div>
 
-    <LyricVideoPanel
-      v-if="exported && vocalStem && showVideoTool"
-      :key="exportVersion"
-      :vocals="vocalStem"
-      :vocals-blob="exported.vocals"
-      :source-name="selectedFile?.name ?? ''"
-    />
+        <LyricVideoPanel
+          v-if="showVideoTool"
+          :key="exportVersion"
+          :vocals="vocalStem"
+          :vocals-blob="exported.vocals"
+          :source-name="selectedFile?.name ?? ''"
+        />
+      </template>
+
+      <div v-else class="card video-lock" aria-disabled="true">
+        <div class="section-heading">
+          <strong>🔒 ویدئوی متن آهنگ (ریلز)</strong>
+          <span class="quality-pill is-muted">غیرفعال</span>
+        </div>
+
+        <ol class="lock-steps">
+          <li>جداسازی صدای خواننده از آهنگ</li>
+          <li>استخراج متن و زمان‌بندی کلمه‌ها با Whisper</li>
+          <li>ساخت ویدئوی عمودی MP4 با متن همگام</li>
+        </ol>
+
+        <p class="option-note" role="status">{{ videoLockMessage }}</p>
+
+        <button
+          v-if="!selectedFile"
+          class="primary-button"
+          @click="triggerFileInput"
+        >
+          انتخاب آهنگ
+        </button>
+        <button class="secondary-button" disabled>
+          باز کردن ابزار ساخت ویدئو
+        </button>
+      </div>
+    </section>
 
     <p class="footer-note">
       مدل در اولین اجرا دانلود می‌شود و در مرورگر کش می‌ماند.
@@ -256,6 +286,18 @@ const isTrimEnabled = computed(
   () => trimVocals.value || trimInstrumental.value,
 );
 
+const videoLockMessage = computed(() => {
+  if (isProcessing.value) {
+    return "جداسازی در حال انجام است. بعد از پایان، این بخش فعال می‌شود.";
+  }
+  if (isExporting.value) {
+    return "خروجی در حال ساخت است. چند لحظه صبر کنید.";
+  }
+  return selectedFile.value
+    ? "آهنگ انتخاب شده است. بعد از پایان جداسازی، این بخش فعال می‌شود."
+    : "برای فعال شدن، ابتدا یک آهنگ انتخاب کنید و جداسازی را اجرا کنید.";
+});
+
 let client: SplitterClient | null = null;
 
 function formatBytes(bytes: number): string {
@@ -324,9 +366,7 @@ function selectFile(file: File): void {
   progressPercent.value = 0;
 }
 
-async function readAudio(
-  file: File,
-): Promise<{
+async function readAudio(file: File): Promise<{
   left: Float32Array;
   right: Float32Array;
   sampleRate: number;
@@ -919,5 +959,59 @@ h1 {
   .option-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+.video-section {
+  scroll-margin-top: 80px;
+}
+
+.video-lock {
+  border-style: dashed;
+}
+
+.video-lock .section-heading strong {
+  color: #91a3bf;
+}
+
+.quality-pill.is-muted {
+  color: #91a3bf;
+  background: rgba(145, 163, 191, 0.14);
+}
+
+.lock-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.lock-steps li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  color: #91a3bf;
+  background: #17243a;
+  border-radius: 9px;
+  font-size: 11px;
+  opacity: 0.75;
+  counter-increment: step;
+}
+
+.lock-steps li::before {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  content: counter(step);
+  color: #63d6b3;
+  background: rgba(99, 214, 179, 0.12);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
 }
 </style>

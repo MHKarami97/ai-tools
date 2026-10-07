@@ -4,6 +4,15 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import type { Plugin } from "vite";
+import { createReadStream, existsSync } from "node:fs";
+import { join } from "node:path";
+
+const ortFilePattern = /^\/ort\/([\w.-]+\.(?:mjs|wasm))$/;
+
+const ortContentTypes: Record<string, string> = {
+  ".mjs": "text/javascript",
+  ".wasm": "application/wasm",
+};
 
 const base = process.env.BASE_PATH ?? "/";
 
@@ -28,9 +37,36 @@ function dropBundledOrtWasm(): Plugin {
   };
 }
 
+function serveOrtRuntimeInDev(): Plugin {
+  return {
+    name: "serve-ort-runtime-in-dev",
+    apply: "serve",
+    configureServer(server) {
+      const ortDirectory = join(server.config.publicDir, "ort");
+      const basePath = server.config.base.replace(/\/$/, "");
+
+      server.middlewares.use((request, response, next) => {
+        const pathname = (request.url ?? "").split("?")[0];
+        const match = ortFilePattern.exec(pathname.slice(basePath.length));
+        if (!match) return next();
+
+        const filePath = join(ortDirectory, match[1]);
+        if (!existsSync(filePath)) return next();
+
+        const extension = match[1].slice(match[1].lastIndexOf("."));
+        response.setHeader("Content-Type", ortContentTypes[extension]);
+        response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+        response.setHeader("Cache-Control", "no-cache");
+        createReadStream(filePath).pipe(response);
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base,
   plugins: [
+    serveOrtRuntimeInDev(),
     vue(),
     tailwindcss(),
     dropBundledOrtWasm(),
