@@ -272,7 +272,7 @@ const showVideoTool = ref(false);
 const exportVersion = ref(0);
 
 const trimVocals = ref(true);
-const trimInstrumental = ref(true);
+const trimInstrumental = ref(false);
 const sensitivity = ref<TrimSensitivity>("balanced");
 const minSilenceSeconds = ref(DEFAULT_TRIM_OPTIONS.minSilenceSeconds);
 
