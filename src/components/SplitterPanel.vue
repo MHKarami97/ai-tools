@@ -151,6 +151,32 @@
       </button>
     </div>
 
+    <div v-if="exported && vocalStem" class="card video-intro">
+      <div class="section-heading">
+        <strong>ویدئوی متن آهنگ (ریلز)</strong>
+        <span class="quality-pill">جدید</span>
+      </div>
+      <p class="option-note">
+        از همین صدای خواننده، یک ویدئوی عمودی با متن همگام می‌سازید. ویدئو از
+        صدای خروجی بالا (با تنظیمات حذف سکوت) ساخته می‌شود.
+      </p>
+      <button
+        v-if="!showVideoTool"
+        class="primary-button"
+        @click="showVideoTool = true"
+      >
+        باز کردن ابزار ساخت ویدئو
+      </button>
+    </div>
+
+    <LyricVideoPanel
+      v-if="exported && vocalStem && showVideoTool"
+      :key="exportVersion"
+      :vocals="vocalStem"
+      :vocals-blob="exported.vocals"
+      :source-name="selectedFile?.name ?? ''"
+    />
+
     <p class="footer-note">
       مدل در اولین اجرا دانلود می‌شود و در مرورگر کش می‌ماند.
     </p>
@@ -158,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, defineAsyncComponent, ref, shallowRef } from "vue";
 import {
   SplitterClient,
   downloadBlob,
@@ -179,6 +205,11 @@ import {
 } from "@/lib/audio/silenceTrimmer";
 import { historyStore } from "@/lib/history/historyStore";
 import { performanceLog } from "@/lib/system/performanceLog";
+import type { VocalStem } from "@/lib/video/videoExporter";
+
+const LyricVideoPanel = defineAsyncComponent(
+  () => import("@/components/LyricVideoPanel.vue"),
+);
 
 interface Stem {
   readonly left: Float32Array;
@@ -211,6 +242,9 @@ const exported = ref<{
   ext: "mp3" | "wav";
 } | null>(null);
 const trimStats = ref<TrimStats | null>(null);
+const vocalStem = shallowRef<VocalStem | null>(null);
+const showVideoTool = ref(false);
+const exportVersion = ref(0);
 
 const trimVocals = ref(true);
 const trimInstrumental = ref(true);
@@ -263,6 +297,14 @@ function onDrop(event: DragEvent): void {
   if (file) selectFile(file);
 }
 
+function resetOutputs(): void {
+  result.value = null;
+  exported.value = null;
+  trimStats.value = null;
+  vocalStem.value = null;
+  showVideoTool.value = false;
+}
+
 function selectFile(file: File): void {
   if (
     !file.type.startsWith("audio/") &&
@@ -275,9 +317,7 @@ function selectFile(file: File): void {
   }
 
   selectedFile.value = file;
-  result.value = null;
-  exported.value = null;
-  trimStats.value = null;
+  resetOutputs();
   fileMeta.value = { name: file.name, size: formatBytes(file.size) };
   statusText.value = "آماده";
   statusDetail.value = "برای شروع، دکمه جداسازی را بزنید.";
@@ -447,6 +487,12 @@ async function buildExports(
       vocals: vocals.removedSeconds,
       instrumental: instrumental.removedSeconds,
     };
+    vocalStem.value = {
+      left: vocals.left,
+      right: vocals.right,
+      sampleRate: data.sampleRate,
+    };
+    exportVersion.value += 1;
 
     if (recordHistory) {
       const name = baseName(source.name);
@@ -465,9 +511,7 @@ async function startSeparation(): Promise<void> {
   if (!selectedFile.value || isBusy.value) return;
 
   isProcessing.value = true;
-  result.value = null;
-  exported.value = null;
-  trimStats.value = null;
+  resetOutputs();
   statusText.value = "در حال خواندن فایل";
   statusDetail.value = "رمزگشایی صدا...";
   progressPercent.value = 2;
@@ -760,7 +804,7 @@ h1 {
 }
 
 .option-note {
-  margin: 12px 0 0;
+  margin: 12px 0;
   color: #91a3bf;
   font-size: 10px;
   line-height: 1.7;
