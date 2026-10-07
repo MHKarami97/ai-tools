@@ -3,6 +3,7 @@ import { WordTimingRefiner } from '@/lib/lyrics/wordTimingRefiner';
 import type { LyricWord } from '@/lib/lyrics/types';
 import {
   WHISPER_SAMPLE_RATE,
+  type ExecutionProfile,
   type RawWord,
   type TranscribeMessage,
   type TranscribeRequest,
@@ -35,18 +36,25 @@ interface TranscriptionOutcome {
   readonly device: Device;
 }
 
+interface ProfileSettings {
+  readonly allowWebGpu: boolean;
+  readonly threadShare: number;
+  readonly yieldMs: number;
+  readonly label: string;
+}
+
 const WINDOW_SECONDS = 30;
 const OVERLAP_SECONDS = 4;
-const YIELD_MS = 60;
 const FALLBACK_WORD_SECONDS = 0.4;
+const PROGRESS_THROTTLE_MS = 150;
+
+const PROFILES: Readonly<Record<ExecutionProfile, ProfileSettings>> = {
+  smooth: { allowWebGpu: false, threadShare: 0.25, yieldMs: 150, label: 'روان' },
+  balanced: { allowWebGpu: true, threadShare: 0.5, yieldMs: 60, label: 'متعادل' },
+  fast: { allowWebGpu: true, threadShare: 0.75, yieldMs: 0, label: 'سریع' },
+};
 
 env.allowLocalModels = false;
-if (env.backends.onnx.wasm) {
-  env.backends.onnx.wasm.numThreads = Math.max(
-    1,
-    Math.floor((navigator.hardwareConcurrency ?? 4) / 2),
-  );
-}
 
 function send(message: TranscribeMessage): void {
   self.postMessage(message);
@@ -54,6 +62,19 @@ function send(message: TranscribeMessage): void {
 
 function pause(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+class ThreadConfigurator {
+  apply(share: number): number {
+    const cores = navigator.hardwareConcurrency ?? 4;
+    const threads = Math.max(1, Math.floor(cores * share));
+    const wasm = env.backends.onnx.wasm;
+
+    if (wasm) {
+      wasm.numThreads = threads;
+    }
+    return self.crossOriginIsolated ? threads : 1;
+  }
 }
 
 class AudioPreprocessor {
@@ -130,6 +151,7 @@ class WindowPlanner {
 
 class DownloadProgress {
   private readonly files = new Map<string, { loaded: number; total: number }>();
+  private lastSentAt = 0;
 
   update(info: ProgressInfo): void {
     if (info.status !== 'progress' || !info.file) {
@@ -145,15 +167,30 @@ class DownloadProgress {
       total += file.total;
     }
 
+    const now = performance.now();
+    if (loaded < total && now - this.lastSentAt < PROGRESS_THROTTLE_MS) {
+      return;
+    }
+
+    this.lastSentAt = now;
     send({ type: 'model-progress', loaded, total });
   }
 }
 
 class WhisperJob {
-  constructor(private readonly request: TranscribeRequest) {}
+  private readonly settings: ProfileSettings;
+
+  constructor(private readonly request: TranscribeRequest) {
+    this.settings = PROFILES[request.profile] ?? PROFILES.smooth;
+  }
 
   async run(): Promise<void> {
-    send({ type: 'status', message: 'در حال آماده‌سازی صدا...' });
+    const threads = new ThreadConfigurator().apply(this.settings.threadShare);
+    send({
+      type: 'status',
+      message: `حالت ${this.settings.label}: ${threads} نخ CPU${self.crossOriginIsolated ? '' : ' (صفحه isolated نیست)'}`,
+    });
+
     const audio = new AudioPreprocessor().toWhisperInput(
       this.request.left,
       this.request.right,
@@ -167,12 +204,12 @@ class WhisperJob {
     }
 
     send({ type: 'status', message: 'در حال دقیق‌سازی زمان‌بندی کلمه‌ها...' });
-    const refined = this.refine(audio, outcome.words);
-    send({ type: 'done', words: refined, device: outcome.device });
+    send({ type: 'done', words: this.refine(audio, outcome.words), device: outcome.device });
   }
 
   private async transcribeWithFallback(audio: Float32Array): Promise<TranscriptionOutcome> {
-    const devices: Device[] = (await this.hasWebGpu()) ? ['webgpu', 'wasm'] : ['wasm'];
+    const useGpu = this.settings.allowWebGpu && (await this.hasWebGpu());
+    const devices: Device[] = useGpu ? ['webgpu', 'wasm'] : ['wasm'];
     let lastError: unknown = null;
 
     for (const device of devices) {
@@ -229,7 +266,9 @@ class WhisperJob {
       const output = await transcriber(audio.subarray(from, to), this.buildOptions());
 
       words.push(...this.parseWords(output, audioWindow));
-      await pause(YIELD_MS);
+      if (this.settings.yieldMs > 0) {
+        await pause(this.settings.yieldMs);
+      }
     }
 
     send({ type: 'window-progress', done: windows.length, total: windows.length });

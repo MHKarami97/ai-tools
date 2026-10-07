@@ -102,6 +102,21 @@
         </label>
       </div>
 
+      <div class="option-grid">
+        <label class="field">
+          <span>حالت اجرا</span>
+          <select v-model="profile" :disabled="isBusy">
+            <option
+              v-for="item in EXECUTION_PROFILES"
+              :key="item.id"
+              :value="item.id"
+            >
+              {{ item.label }}
+            </option>
+          </select>
+        </label>
+      </div>
+
       <button
         class="primary-button"
         :disabled="isBusy || !rangeValid"
@@ -495,7 +510,12 @@ import {
   TranscribeClient,
   type TranscribeProgress,
 } from "@/lib/lyrics/transcribeClient";
-import { LANGUAGES, WHISPER_MODELS } from "@/lib/lyrics/transcribeProtocol";
+import {
+  EXECUTION_PROFILES,
+  LANGUAGES,
+  WHISPER_MODELS,
+  type ExecutionProfile,
+} from "@/lib/lyrics/transcribeProtocol";
 import {
   linesToText,
   type LyricLine,
@@ -531,6 +551,7 @@ const rangeEnd = ref(Math.min(duration, DEFAULT_CLIP_SECONDS));
 
 const languageCode = ref<string | null>("persian");
 const modelId = ref(WHISPER_MODELS[0].id);
+const profile = ref<ExecutionProfile>("smooth");
 const isTranscribing = ref(false);
 const transcribeStatus = ref("");
 const downloadPercent = ref(0);
@@ -718,6 +739,7 @@ async function transcribe(): Promise<void> {
       range: selected,
       modelId: modelId.value,
       language: languageCode.value,
+      profile: profile.value,
     });
 
     if (result.words.length === 0) {

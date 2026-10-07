@@ -10,6 +10,13 @@ export interface LanguageOption {
   readonly label: string;
 }
 
+export type ExecutionProfile = 'smooth' | 'balanced' | 'fast';
+
+export interface ExecutionProfileOption {
+  readonly id: ExecutionProfile;
+  readonly label: string;
+}
+
 export const WHISPER_MODELS: readonly WhisperModelOption[] = [
   { id: 'onnx-community/whisper-base_timestamped', label: 'Base (سریع‌تر، دقت کمتر)' },
   { id: 'onnx-community/whisper-small_timestamped', label: 'Small (دقیق‌تر، سنگین‌تر)' },
@@ -23,6 +30,12 @@ export const LANGUAGES: readonly LanguageOption[] = [
   { code: null, label: 'تشخیص خودکار' },
 ];
 
+export const EXECUTION_PROFILES: readonly ExecutionProfileOption[] = [
+  { id: 'smooth', label: 'روان (CPU سبک، کندتر)' },
+  { id: 'balanced', label: 'متعادل (WebGPU، نصف هسته‌ها)' },
+  { id: 'fast', label: 'سریع (WebGPU، بیشترین منابع)' },
+];
+
 export const WHISPER_SAMPLE_RATE = 16000;
 
 export interface TranscribeInput {
@@ -32,6 +45,7 @@ export interface TranscribeInput {
   readonly range: TimeRange;
   readonly modelId: string;
   readonly language: string | null;
+  readonly profile: ExecutionProfile;
 }
 
 export interface TranscribeRequest {
@@ -42,6 +56,7 @@ export interface TranscribeRequest {
   readonly rangeStart: number;
   readonly modelId: string;
   readonly language: string | null;
+  readonly profile: ExecutionProfile;
 }
 
 export interface RawWord {

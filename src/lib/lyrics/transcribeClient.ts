@@ -68,6 +68,7 @@ export class TranscribeClient {
       rangeStart: input.range.start,
       modelId: input.modelId,
       language: input.language,
+      profile: input.profile,
     };
   }
 
