@@ -5,7 +5,7 @@
       <div>
         <p class="eyebrow">Voice Splitter</p>
         <h1>جداسازی صدای خواننده از موسیقی</h1>
-        <p class="subtitle">پردازش کاملاً روی دستگاه شما، بدون آپلود فایل</p>
+        <p class="subtitle">پردازش کاملا روی دستگاه شما، بدون آپلود فایل</p>
       </div>
     </div>
 
@@ -74,11 +74,6 @@
           </select>
         </label>
       </div>
-
-      <p class="option-note">
-        هر استم جداگانه بررسی می‌شود. اگر هر دو را (حذف سکوت) کنید، طول دو فایل
-        با هم فرق می‌کند و روی هم همگام نخواهند بود.
-      </p>
     </div>
 
     <div class="card">
@@ -155,7 +150,7 @@
       <template v-if="exported && vocalStem">
         <div class="card video-intro">
           <div class="section-heading">
-            <strong>ویدئوی متن آهنگ (ریلز)</strong>
+            <strong>ویدئوی متن آهنگ</strong>
             <span class="quality-pill">جدید</span>
           </div>
           <p class="option-note">
@@ -182,14 +177,14 @@
 
       <div v-else class="card video-lock" aria-disabled="true">
         <div class="section-heading">
-          <strong>🔒 ویدئوی متن آهنگ (ریلز)</strong>
+          <strong>🔒 ویدئوی متن آهنگ</strong>
           <span class="quality-pill is-muted">غیرفعال</span>
         </div>
 
         <ol class="lock-steps">
           <li>جداسازی صدای خواننده از آهنگ</li>
-          <li>استخراج متن و زمان‌بندی کلمه‌ها با Whisper</li>
-          <li>ساخت ویدئوی عمودی MP4 با متن همگام</li>
+          <li>استخراج متن و زمان‌بندی کلمه‌ها با</li>
+          <li>ساخت ویدئو MP4 با متن همگام</li>
         </ol>
 
         <p class="option-note" role="status">{{ videoLockMessage }}</p>

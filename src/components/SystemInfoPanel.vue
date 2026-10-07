@@ -93,7 +93,7 @@ onMounted(async () => {
     </div>
     
     <p class="text-xs text-slate-500 dark:text-slate-400">
-      جداسازی صدا ابتدا WebGPU را امتحان می‌کند و در صورت نبودن به CPU برمی‌گردد. مدل گفتار فعلاً همیشه روی CPU اجرا می‌شود.
+      جداسازی صدا ابتدا WebGPU را امتحان می‌کند و در صورت نبودن به CPU برمی‌گردد. مدل گفتار فعلا همیشه روی CPU اجرا می‌شود.
     </p>
 
     <div class="space-y-3 rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">

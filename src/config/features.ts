@@ -22,7 +22,7 @@ export const features: readonly Feature[] = [
     path: '/tts',
     name: 'tts',
     label: 'تبدیل متن به گفتار',
-    description: 'سنتز گفتار فارسی با کلون صدا، کاملاً در مرورگر',
+    description: 'سنتز گفتار فارسی با کلون صدا، کاملا در مرورگر',
     showInNav: false,
     showInHome: true,
     load: () => import('@/pages/TtsPage.vue'),

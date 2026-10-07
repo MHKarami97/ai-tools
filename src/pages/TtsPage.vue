@@ -267,7 +267,7 @@ onBeforeUnmount(() => {
         @change="onVoiceChange"
       />
       <p v-if="processingVoice" class="text-sm text-amber-700 dark:text-amber-400">
-        در حال پردازش صدای مرجع… لطفاً صبر کنید تا کامل شود.
+        در حال پردازش صدای مرجع… لطفا صبر کنید تا کامل شود.
       </p>
       <p v-if="hasVoice" class="text-sm text-emerald-700 dark:text-emerald-400">
         صدای ذخیره‌شده: <span dir="ltr">{{ voiceName || VOICE_ID }}</span>

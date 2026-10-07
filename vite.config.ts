@@ -53,6 +53,12 @@ function serveOrtRuntimeInDev(): Plugin {
         const filePath = join(ortDirectory, match[1]);
         if (!existsSync(filePath)) return next();
 
+        for (const [name, value] of Object.entries(
+          crossOriginIsolationHeaders,
+        )) {
+          response.setHeader(name, value);
+        }
+
         const extension = match[1].slice(match[1].lastIndexOf("."));
         response.setHeader("Content-Type", ortContentTypes[extension]);
         response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
@@ -81,7 +87,7 @@ export default defineConfig({
       manifest: {
         name: "ابزارهای هوش مصنوعی آفلاین",
         short_name: "AI Tools",
-        description: "تبدیل متن به گفتار فارسی و جداسازی صدا، کاملاً در مرورگر",
+        description: "تبدیل متن به گفتار فارسی و جداسازی صدا، کاملا در مرورگر",
         lang: "fa",
         dir: "rtl",
         display: "standalone",
