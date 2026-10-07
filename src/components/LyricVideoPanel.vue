@@ -466,7 +466,6 @@ import {
   shallowRef,
   watch,
 } from "vue";
-import { audioPrep } from "@/lib/video/audioPrep";
 import { fontLoader } from "@/lib/video/fontLoader";
 import { LyricFrameRenderer } from "@/lib/video/lyricRenderer";
 import {
@@ -496,18 +495,13 @@ import {
   TranscribeClient,
   type TranscribeProgress,
 } from "@/lib/lyrics/transcribeClient";
-import {
-  LANGUAGES,
-  WHISPER_MODELS,
-  WHISPER_SAMPLE_RATE,
-} from "@/lib/lyrics/transcribeProtocol";
+import { LANGUAGES, WHISPER_MODELS } from "@/lib/lyrics/transcribeProtocol";
 import {
   linesToText,
   type LyricLine,
   type LyricWord,
   type TimeRange,
 } from "@/lib/lyrics/types";
-import { WordTimingRefiner } from "@/lib/lyrics/wordTimingRefiner";
 import { baseName } from "@/lib/splitter/client";
 
 const props = defineProps<{
@@ -693,6 +687,16 @@ function onTranscribeProgress(progress: TranscribeProgress): void {
     return;
   }
 
+  if (progress.kind === "decode") {
+    downloadPercent.value =
+      progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
+    transcribeStatus.value =
+      progress.done >= progress.total
+        ? "در حال نهایی‌سازی..."
+        : `در حال تشخیص متن: بخش ${progress.done + 1} از ${progress.total}`;
+    return;
+  }
+
   downloadPercent.value = 0;
   transcribeStatus.value = progress.message;
 }
@@ -706,43 +710,22 @@ async function transcribe(): Promise<void> {
   const selected: TimeRange = { start: rangeStart.value, end: rangeEnd.value };
 
   try {
-    const mono = audioPrep.mixToMono(
-      props.vocals.left,
-      props.vocals.right,
-      selected.start,
-      selected.end,
-      props.vocals.sampleRate,
-    );
-    const audio = await audioPrep.resample(
-      mono,
-      props.vocals.sampleRate,
-      WHISPER_SAMPLE_RATE,
-    );
-
     transcribeClient.onProgress = onTranscribeProgress;
     const result = await transcribeClient.transcribe({
-      audio: audio.slice(),
+      left: props.vocals.left,
+      right: props.vocals.right,
+      sampleRate: props.vocals.sampleRate,
+      range: selected,
       modelId: modelId.value,
       language: languageCode.value,
     });
 
-    const absolute = result.words.map((word) => ({
-      text: word.text,
-      start: word.start + selected.start,
-      end: word.end + selected.start,
-    }));
-
-    if (absolute.length === 0) {
+    if (result.words.length === 0) {
       transcribeStatus.value = "متنی تشخیص داده نشد. بازه یا زبان را عوض کنید.";
       return;
     }
 
-    const refiner = new WordTimingRefiner(
-      audio,
-      WHISPER_SAMPLE_RATE,
-      selected.start,
-    );
-    words.value = refiner.refine(absolute);
+    words.value = result.words;
     transcribedRange.value = selected;
     applyLines(
       lineBuilder.build(words.value, {

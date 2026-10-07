@@ -1,3 +1,5 @@
+import type { LyricWord, TimeRange } from './types';
+
 export interface WhisperModelOption {
   readonly id: string;
   readonly label: string;
@@ -23,9 +25,21 @@ export const LANGUAGES: readonly LanguageOption[] = [
 
 export const WHISPER_SAMPLE_RATE = 16000;
 
+export interface TranscribeInput {
+  readonly left: Float32Array;
+  readonly right: Float32Array;
+  readonly sampleRate: number;
+  readonly range: TimeRange;
+  readonly modelId: string;
+  readonly language: string | null;
+}
+
 export interface TranscribeRequest {
   readonly type: 'transcribe';
-  readonly audio: Float32Array;
+  readonly left: Float32Array;
+  readonly right: Float32Array;
+  readonly sampleRate: number;
+  readonly rangeStart: number;
   readonly modelId: string;
   readonly language: string | null;
 }
@@ -38,6 +52,7 @@ export interface RawWord {
 
 export type TranscribeMessage =
   | { readonly type: 'model-progress'; readonly loaded: number; readonly total: number }
+  | { readonly type: 'window-progress'; readonly done: number; readonly total: number }
   | { readonly type: 'status'; readonly message: string }
-  | { readonly type: 'done'; readonly words: readonly RawWord[]; readonly device: 'webgpu' | 'wasm' }
+  | { readonly type: 'done'; readonly words: readonly LyricWord[]; readonly device: 'webgpu' | 'wasm' }
   | { readonly type: 'error'; readonly message: string };
