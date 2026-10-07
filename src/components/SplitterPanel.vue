@@ -38,16 +38,63 @@
     </div>
 
     <div class="card">
+      <div class="section-heading">
+        <strong>حذف بخش‌های خالی</strong>
+        <span class="quality-pill">اختیاری</span>
+      </div>
+
+      <label class="toggle-row">
+        <input v-model="trimVocals" type="checkbox" :disabled="isBusy" />
+        <span>حذف سکوت از صدای خواننده</span>
+      </label>
+      <label class="toggle-row">
+        <input v-model="trimInstrumental" type="checkbox" :disabled="isBusy" />
+        <span>حذف سکوت از آهنگ</span>
+      </label>
+
+      <div class="option-grid">
+        <label class="field">
+          <span>حساسیت</span>
+          <select v-model="sensitivity" :disabled="isBusy || !isTrimEnabled">
+            <option value="gentle">ملایم (فقط سکوت کامل)</option>
+            <option value="balanced">متوسط (پیشنهادی)</option>
+            <option value="aggressive">تهاجمی (نشتی صدا هم حذف شود)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>حداقل طول سکوت برای حذف</span>
+          <select
+            v-model.number="minSilenceSeconds"
+            :disabled="isBusy || !isTrimEnabled"
+          >
+            <option :value="0.5">۰٫۵ ثانیه</option>
+            <option :value="1">۱ ثانیه (پیشنهادی)</option>
+            <option :value="2">۲ ثانیه</option>
+            <option :value="3">۳ ثانیه</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="option-note">
+        هر استم جداگانه بررسی می‌شود. اگر هر دو را (حذف سکوت) کنید، طول دو فایل با
+        هم فرق می‌کند و روی هم همگام نخواهند بود.
+      </p>
+    </div>
+
+    <div class="card">
       <div class="status-row">
         <strong>{{ statusText }}</strong>
       </div>
       <div class="progress-track">
-        <div class="progress-bar" :style="{ width: progressPercent + '%' }" />
+        <div
+          class="progress-bar"
+          :style="{ width: progressPercent + '%' }"
+        ></div>
       </div>
       <p class="status-detail">{{ statusDetail }}</p>
       <button
         class="primary-button"
-        :disabled="!selectedFile || isProcessing"
+        :disabled="!selectedFile || isBusy"
         @click="startSeparation"
       >
         شروع جداسازی
@@ -57,20 +104,23 @@
         class="secondary-button"
         @click="cancelSeparation"
       >
-        لغو پردازش
+        لغو
       </button>
     </div>
 
     <div v-if="exported" class="card results-card">
       <div class="section-heading">
-        <strong>خروجی آماده است</strong>
-        <span class="quality-pill">{{ exported?.ext === 'wav' ? 'WAV' : `MP3 · ${MP3_KBPS} kbps` }}</span>
+        <strong>خروجی</strong>
+        <span class="quality-pill">{{
+          exported.ext === "wav" ? "WAV" : "MP3 " + MP3_KBPS + " kbps"
+        }}</span>
       </div>
+
       <div class="result-list">
         <div class="result-row">
           <div>
             <strong>صدای خواننده</strong>
-            <span>Vocal stem</span>
+            <span>Vocal stem{{ trimNote(trimStats?.vocals) }}</span>
           </div>
           <button class="download-button" @click="downloadResult('vocals')">
             دانلود
@@ -78,8 +128,10 @@
         </div>
         <div class="result-row">
           <div>
-            <strong>موسیقی بی‌کلام</strong>
-            <span>Instrumental stem</span>
+            <strong>آهنگ بی‌کلام</strong>
+            <span
+              >Instrumental stem{{ trimNote(trimStats?.instrumental) }}</span
+            >
           </div>
           <button
             class="download-button"
@@ -89,6 +141,14 @@
           </button>
         </div>
       </div>
+
+      <button
+        class="secondary-button"
+        :disabled="isBusy"
+        @click="rebuildExports"
+      >
+        اعمال دوباره تنظیمات حذف سکوت (بدون جداسازی مجدد)
+      </button>
     </div>
 
     <p class="footer-note">
@@ -98,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import {
   SplitterClient,
   downloadBlob,
@@ -110,33 +170,68 @@ import type {
   SplitterResult,
 } from "@/lib/splitter/client";
 import { encodeMp3 } from "@/lib/audio/mp3Client";
+import {
+  DEFAULT_TRIM_OPTIONS,
+  SENSITIVITY_DB,
+  SilenceTrimmer,
+  type SilenceTrimOptions,
+  type TrimSensitivity,
+} from "@/lib/audio/silenceTrimmer";
 import { historyStore } from "@/lib/history/historyStore";
 import { performanceLog } from "@/lib/system/performanceLog";
+
+interface Stem {
+  readonly left: Float32Array;
+  readonly right: Float32Array;
+  readonly removedSeconds: number;
+}
+
+interface TrimStats {
+  readonly vocals: number;
+  readonly instrumental: number;
+}
+
+const MODEL_SIZE_MB = 172;
+const MP3_KBPS = 192;
+const TARGET_SAMPLE_RATE = 44100;
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const isDragging = ref(false);
 const selectedFile = ref<File | null>(null);
 const fileMeta = ref<{ name: string; size: string } | null>(null);
 const isProcessing = ref(false);
+const isExporting = ref(false);
 const statusText = ref("آماده");
-const statusDetail = ref("فایل انتخاب شد. برای شروع روی دکمه زیر بزنید.");
+const statusDetail = ref("یک فایل صوتی انتخاب کنید.");
 const progressPercent = ref(0);
 const result = ref<SplitterResult | null>(null);
-const exported = ref<{ vocals: Blob; instrumental: Blob; ext: 'mp3' | 'wav' } | null>(null)
+const exported = ref<{
+  vocals: Blob;
+  instrumental: Blob;
+  ext: "mp3" | "wav";
+} | null>(null);
+const trimStats = ref<TrimStats | null>(null);
+
+const trimVocals = ref(true);
+const trimInstrumental = ref(true);
+const sensitivity = ref<TrimSensitivity>("balanced");
+const minSilenceSeconds = ref(DEFAULT_TRIM_OPTIONS.minSilenceSeconds);
+
+const isBusy = computed(() => isProcessing.value || isExporting.value);
+const isTrimEnabled = computed(
+  () => trimVocals.value || trimInstrumental.value,
+);
 
 let client: SplitterClient | null = null;
 
-const MODEL_SIZE_MB = 172;
-const MP3_KBPS = 192;
-
 function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "حجم نامشخص";
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} کیلوبایت`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} مگابایت`;
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
 }
 
 function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds)) return "";
+  if (!Number.isFinite(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60)
     .toString()
@@ -144,41 +239,54 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs}`;
 }
 
-function triggerFileInput() {
+function trimNote(removedSeconds: number | undefined): string {
+  if (removedSeconds === undefined || removedSeconds <= 0) return "";
+  return ` · ${formatDuration(removedSeconds)} سکوت حذف شد`;
+}
+
+function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function triggerFileInput(): void {
   fileInput.value?.click();
 }
 
-function onFileChange(event: Event) {
+function onFileChange(event: Event): void {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (file) selectFile(file);
 }
 
-function onDrop(event: DragEvent) {
+function onDrop(event: DragEvent): void {
   isDragging.value = false;
-  const file = event.dataTransfer?.files[0];
+  const file = event.dataTransfer?.files?.[0];
   if (file) selectFile(file);
 }
 
-function selectFile(file: File) {
+function selectFile(file: File): void {
   if (
     !file.type.startsWith("audio/") &&
     !/\.(mp3|wav|m4a|ogg|flac)$/i.test(file.name)
   ) {
-    statusText.value = "فایل نامعتبر";
-    statusDetail.value = "لطفاً یک فایل صوتی قابل‌پخش انتخاب کنید.";
+    statusText.value = "فرمت پشتیبانی نمی‌شود";
+    statusDetail.value = "یک فایل MP3، WAV، M4A، OGG یا FLAC انتخاب کنید.";
     progressPercent.value = 0;
     return;
   }
+
   selectedFile.value = file;
   result.value = null;
   exported.value = null;
+  trimStats.value = null;
   fileMeta.value = { name: file.name, size: formatBytes(file.size) };
   statusText.value = "آماده";
-  statusDetail.value = "فایل انتخاب شد. برای شروع روی دکمه زیر بزنید.";
+  statusDetail.value = "برای شروع، دکمه جداسازی را بزنید.";
   progressPercent.value = 0;
 }
 
-async function readAudio(file: File): Promise<{
+async function readAudio(
+  file: File,
+): Promise<{
   left: Float32Array;
   right: Float32Array;
   sampleRate: number;
@@ -187,13 +295,17 @@ async function readAudio(file: File): Promise<{
   const context = new AudioContext();
   try {
     const decoded = await context.decodeAudioData(await file.arrayBuffer());
-    const length = decoded.length;
     const left = decoded.getChannelData(0).slice();
     const right =
       decoded.numberOfChannels > 1
         ? decoded.getChannelData(1).slice()
         : left.slice();
-    return { left, right, sampleRate: decoded.sampleRate, length };
+    return {
+      left,
+      right,
+      sampleRate: decoded.sampleRate,
+      length: decoded.length,
+    };
   } finally {
     await context.close();
   }
@@ -205,29 +317,32 @@ function resampleChannel(
   toRate: number,
 ): Float32Array {
   if (fromRate === toRate) return input;
+
   const outputLength = Math.max(
     1,
     Math.round((input.length * toRate) / fromRate),
   );
   const output = new Float32Array(outputLength);
   const ratio = fromRate / toRate;
+
   for (let i = 0; i < outputLength; i += 1) {
     const position = i * ratio;
     const index = Math.floor(position);
     const fraction = position - index;
-    const a = input[Math.min(index, input.length - 1)] || 0;
-    const b = input[Math.min(index + 1, input.length - 1)] || a;
+    const a = input[Math.min(index, input.length - 1)] ?? 0;
+    const b = input[Math.min(index + 1, input.length - 1)] ?? a;
     output[i] = a + (b - a) * fraction;
   }
+
   return output;
 }
 
-function onProgress(state: SplitterProgressState) {
+function onProgress(state: SplitterProgressState): void {
   if (state.type === "model") {
-    const loaded = state.loaded || 0;
+    const loaded = state.loaded ?? 0;
     const total = state.total || MODEL_SIZE_MB * 1024 * 1024;
     statusText.value = "در حال دانلود مدل";
-    statusDetail.value = `${formatBytes(loaded)} از حدود ${formatBytes(total)} · این مرحله فقط بار اول انجام می‌شود.`;
+    statusDetail.value = `${formatBytes(loaded)} از ${formatBytes(total)}`;
     progressPercent.value = (loaded / total) * 100;
   } else if (state.type === "process") {
     if (state.message) {
@@ -236,103 +351,201 @@ function onProgress(state: SplitterProgressState) {
       progressPercent.value = 100;
     } else if (typeof state.progress === "number") {
       statusText.value = "در حال جداسازی";
-      statusDetail.value = `قطعه ${state.currentSegment ?? "?"} از ${state.totalSegments ?? "?"}`;
+      statusDetail.value = `بخش ${state.currentSegment ?? 0} از ${state.totalSegments ?? 0}`;
       progressPercent.value = state.progress * 100;
     }
   }
 }
 
-async function buildExports(source: File, data: SplitterResult): Promise<void> {
-  statusText.value = "در حال تبدیل به MP3";
-  statusDetail.value = "خروجی‌ها فشرده می‌شوند تا حجم کمتری داشته باشند…";
-  progressPercent.value = 100;
-
-  let vocals: Blob;
-  let instrumental: Blob;
-  let ext: "mp3" | "wav" = "mp3";
-  try {
-    const blobs = await Promise.all([
-      encodeMp3([data.vocalsLeft, data.vocalsRight], data.sampleRate, MP3_KBPS),
-      encodeMp3(
-        [data.instrumentalLeft, data.instrumentalRight],
-        data.sampleRate,
-        MP3_KBPS,
-      ),
-    ]);
-    vocals = blobs[0];
-    instrumental = blobs[1];
-  } catch (error) {
-    console.error("MP3 encoding failed, falling back to WAV", error);
-    ext = "wav";
-    vocals = encodeWav(data.vocalsLeft, data.vocalsRight, data.sampleRate);
-    instrumental = encodeWav(
-      data.instrumentalLeft,
-      data.instrumentalRight,
-      data.sampleRate,
-    );
-  }
-
-  exported.value = { vocals, instrumental, ext };
-  const name = baseName(source.name);
-  await historyStore.add({
-    kind: "splitter",
-    sourceName: source.name,
-    outputs: [`${name}_vocals.${ext}`, `${name}_instrumental.${ext}`],
-  });
+function currentTrimOptions(): SilenceTrimOptions {
+  return {
+    ...DEFAULT_TRIM_OPTIONS,
+    thresholdDb: SENSITIVITY_DB[sensitivity.value],
+    minSilenceSeconds: minSilenceSeconds.value,
+  };
 }
 
-async function startSeparation() {
-  if (!selectedFile.value || isProcessing.value) return;
+function prepareStem(
+  trimmer: SilenceTrimmer,
+  left: Float32Array,
+  right: Float32Array,
+  enabled: boolean,
+): Stem {
+  if (!enabled) return { left, right, removedSeconds: 0 };
+
+  const trimmed = trimmer.trim(left, right, currentTrimOptions());
+  return {
+    left: trimmed.left,
+    right: trimmed.right,
+    removedSeconds: trimmed.removedSeconds,
+  };
+}
+
+async function buildExports(
+  source: File,
+  data: SplitterResult,
+  recordHistory: boolean,
+): Promise<void> {
+  isExporting.value = true;
+
+  try {
+    if (isTrimEnabled.value) {
+      statusText.value = "در حال حذف بخش‌های خالی";
+      statusDetail.value = "تشخیص سکوت در استم‌ها...";
+      progressPercent.value = 100;
+      await yieldToUi();
+    }
+
+    const trimmer = new SilenceTrimmer(data.sampleRate);
+    const vocals = prepareStem(
+      trimmer,
+      data.vocalsLeft,
+      data.vocalsRight,
+      trimVocals.value,
+    );
+    const instrumental = prepareStem(
+      trimmer,
+      data.instrumentalLeft,
+      data.instrumentalRight,
+      trimInstrumental.value,
+    );
+
+    statusText.value = "در حال ساخت خروجی";
+    statusDetail.value = "کدگذاری MP3...";
+    await yieldToUi();
+
+    let vocalsBlob: Blob;
+    let instrumentalBlob: Blob;
+    let ext: "mp3" | "wav" = "mp3";
+
+    try {
+      [vocalsBlob, instrumentalBlob] = await Promise.all([
+        encodeMp3([vocals.left, vocals.right], data.sampleRate, MP3_KBPS),
+        encodeMp3(
+          [instrumental.left, instrumental.right],
+          data.sampleRate,
+          MP3_KBPS,
+        ),
+      ]);
+    } catch (error) {
+      console.error("MP3 encoding failed, falling back to WAV", error);
+      ext = "wav";
+      vocalsBlob = encodeWav(vocals.left, vocals.right, data.sampleRate);
+      instrumentalBlob = encodeWav(
+        instrumental.left,
+        instrumental.right,
+        data.sampleRate,
+      );
+    }
+
+    exported.value = {
+      vocals: vocalsBlob,
+      instrumental: instrumentalBlob,
+      ext,
+    };
+    trimStats.value = {
+      vocals: vocals.removedSeconds,
+      instrumental: instrumental.removedSeconds,
+    };
+
+    if (recordHistory) {
+      const name = baseName(source.name);
+      await historyStore.add({
+        kind: "splitter",
+        sourceName: source.name,
+        outputs: [`${name}-vocals.${ext}`, `${name}-instrumental.${ext}`],
+      });
+    }
+  } finally {
+    isExporting.value = false;
+  }
+}
+
+async function startSeparation(): Promise<void> {
+  if (!selectedFile.value || isBusy.value) return;
+
   isProcessing.value = true;
   result.value = null;
   exported.value = null;
+  trimStats.value = null;
   statusText.value = "در حال خواندن فایل";
-  statusDetail.value = "فایل صوتی فقط در همین مرورگر خوانده می‌شود…";
+  statusDetail.value = "رمزگشایی صدا...";
   progressPercent.value = 2;
+
   try {
     const source = selectedFile.value;
     const decoded = await readAudio(source);
-    const left = resampleChannel(decoded.left, decoded.sampleRate, 44100);
-    const right = resampleChannel(decoded.right, decoded.sampleRate, 44100);
-    const duration = left.length / 44100;
-    statusText.value = "در حال آماده‌سازی";
-    statusDetail.value = `مدت زمان فایل: ${formatDuration(duration)} · مدل روی دستگاه شما اجرا می‌شود.`;
+    const left = resampleChannel(
+      decoded.left,
+      decoded.sampleRate,
+      TARGET_SAMPLE_RATE,
+    );
+    const right = resampleChannel(
+      decoded.right,
+      decoded.sampleRate,
+      TARGET_SAMPLE_RATE,
+    );
+    const duration = left.length / TARGET_SAMPLE_RATE;
+
+    statusText.value = "آماده جداسازی";
+    statusDetail.value = `مدت فایل ${formatDuration(duration)}`;
     progressPercent.value = 5;
+
     client = new SplitterClient();
     client.onProgress = onProgress;
+
     const startedAt = performance.now();
     await client.separate(left, right);
     performanceLog.record("splitter", duration, performance.now() - startedAt);
+
     result.value = client.getResult();
-    if (result.value) await buildExports(source, result.value);
     isProcessing.value = false;
-    statusText.value = "تمام شد";
-    statusDetail.value = "دو خروجی MP3 آماده دانلود هستند.";
+
+    if (result.value) {
+      await buildExports(source, result.value, true);
+    }
+
+    statusText.value = "انجام شد";
+    statusDetail.value = "فایل‌ها آماده دانلود هستند.";
     progressPercent.value = 100;
   } catch (error) {
     isProcessing.value = false;
-    statusText.value = "خطا در پردازش فایل";
-    statusDetail.value =
-      (error as Error).message || "فرمت فایل پشتیبانی نمی‌شود.";
+    statusText.value = "خطا";
+    statusDetail.value = (error as Error).message;
     progressPercent.value = 0;
   }
 }
 
-function cancelSeparation() {
+async function rebuildExports(): Promise<void> {
+  if (!selectedFile.value || !result.value || isBusy.value) return;
+
+  try {
+    await buildExports(selectedFile.value, result.value, false);
+    statusText.value = "انجام شد";
+    statusDetail.value = "خروجی با تنظیمات جدید ساخته شد.";
+  } catch (error) {
+    statusText.value = "خطا";
+    statusDetail.value = (error as Error).message;
+  }
+}
+
+function cancelSeparation(): void {
   if (!isProcessing.value) return;
+
   isProcessing.value = false;
   client?.cancel();
   client = null;
   statusText.value = "لغو شد";
-  statusDetail.value = "می‌توانید دوباره پردازش را شروع کنید.";
+  statusDetail.value = "جداسازی متوقف شد.";
   progressPercent.value = 0;
 }
 
-function downloadResult(kind: "vocals" | "instrumental") {
+function downloadResult(kind: "vocals" | "instrumental"): void {
   if (!exported.value || !selectedFile.value) return;
+
   downloadBlob(
     exported.value[kind],
-    `${baseName(selectedFile.value.name)}_${kind}.${exported.value.ext}`,
+    `${baseName(selectedFile.value.name)}-${kind}.${exported.value.ext}`,
   );
 }
 </script>
@@ -343,12 +556,14 @@ function downloadResult(kind: "vocals" | "instrumental") {
   margin: 0 auto;
   padding: 20px 16px 24px;
 }
+
 .hero {
   display: flex;
   align-items: center;
   gap: 13px;
   margin-bottom: 18px;
 }
+
 .brand-mark {
   display: grid;
   width: 42px;
@@ -362,6 +577,7 @@ function downloadResult(kind: "vocals" | "instrumental") {
   font-size: 25px;
   font-weight: 800;
 }
+
 .eyebrow {
   margin: 0 0 4px;
   color: #63d6b3;
@@ -369,21 +585,25 @@ function downloadResult(kind: "vocals" | "instrumental") {
   font-weight: 800;
   letter-spacing: 0.08em;
 }
+
 h1,
 h2,
 p {
   margin-top: 0;
 }
+
 h1 {
   margin-bottom: 4px;
   font-size: 19px;
   letter-spacing: -0.02em;
 }
+
 .subtitle {
   margin-bottom: 0;
   color: #91a3bf;
   font-size: 11px;
 }
+
 .card {
   margin-bottom: 13px;
   padding: 15px;
@@ -392,6 +612,7 @@ h1 {
   border-radius: 16px;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
 }
+
 .file-drop {
   display: flex;
   min-height: 148px;
@@ -414,30 +635,36 @@ h1 {
     background 0.2s,
     transform 0.2s;
 }
+
 .file-drop:hover,
 .file-drop.is-dragging {
   background: rgba(99, 214, 179, 0.14);
   border-color: #63d6b3;
   transform: translateY(-1px);
 }
+
 .file-drop:focus-visible {
   outline: 2px solid #63d6b3;
   outline-offset: 3px;
 }
+
 .upload-icon {
   color: #63d6b3;
   font-size: 25px;
   font-weight: 300;
 }
+
 .drop-title {
   font-size: 13px;
   font-weight: 750;
 }
+
 .drop-help {
   color: #91a3bf;
   font-size: 10px;
   line-height: 1.6;
 }
+
 .file-meta {
   margin-top: 11px;
   padding: 9px 11px;
@@ -447,9 +674,11 @@ h1 {
   font-size: 11px;
   word-break: break-word;
 }
+
 .file-meta strong {
   color: #e7eefc;
 }
+
 .status-row,
 .section-heading,
 .result-row {
@@ -458,21 +687,92 @@ h1 {
   justify-content: space-between;
   gap: 12px;
 }
+
 .status-row {
   margin-bottom: 10px;
   color: #91a3bf;
   font-size: 11px;
 }
-.status-row strong {
+
+.status-row strong,
+.section-heading strong {
   color: #e7eefc;
+  font-size: 12px;
+}
+
+.section-heading {
+  margin-bottom: 12px;
+}
+
+.quality-pill {
+  padding: 3px 9px;
+  color: #63d6b3;
+  background: rgba(99, 214, 179, 0.12);
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  color: #e7eefc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #63d6b3;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #91a3bf;
   font-size: 11px;
 }
+
+.field select {
+  width: 100%;
+  padding: 9px 10px;
+  color: #e7eefc;
+  background: #0b1322;
+  border: 1px solid rgba(164, 188, 226, 0.2);
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.field select:disabled {
+  opacity: 0.5;
+}
+
+.option-note {
+  margin: 12px 0 0;
+  color: #91a3bf;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
 .progress-track {
   height: 7px;
   overflow: hidden;
   background: #0b1322;
   border-radius: 99px;
 }
+
 .progress-bar {
   width: 0;
   height: 100%;
@@ -480,6 +780,7 @@ h1 {
   border-radius: inherit;
   transition: width 0.25s ease;
 }
+
 .status-detail {
   min-height: 31px;
   margin: 9px 0 13px;
@@ -487,86 +788,92 @@ h1 {
   font-size: 10px;
   line-height: 1.55;
 }
+
 .primary-button,
 .secondary-button {
   width: 100%;
   padding: 11px 14px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
   border: 0;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
   cursor: pointer;
-  transition:
-    filter 0.2s,
-    transform 0.2s,
-    opacity 0.2s;
+  transition: opacity 0.2s;
 }
+
 .primary-button {
-  color: #061a18;
-  background: linear-gradient(100deg, #63d6b3, #86cbff);
+  color: #06241d;
+  background: linear-gradient(135deg, #63d6b3, #82a9ff);
 }
-.primary-button:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-.primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
+
 .secondary-button {
   margin-top: 8px;
-  color: #ee8090;
-  background: rgba(238, 128, 144, 0.1);
+  color: #e7eefc;
+  background: transparent;
+  border: 1px solid rgba(164, 188, 226, 0.28);
 }
-.results-card {
-  border-color: rgba(99, 214, 179, 0.3);
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
-.section-heading {
-  margin-bottom: 13px;
-}
-.quality-pill {
-  padding: 4px 7px;
-  color: #63d6b3;
-  background: rgba(99, 214, 179, 0.12);
-  border-radius: 99px;
-  font-size: 9px;
-  font-weight: 800;
-}
+
 .result-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  margin-bottom: 4px;
 }
+
 .result-row {
-  padding: 10px 11px;
+  padding: 10px 12px;
   background: #17243a;
-  border-radius: 10px;
+  border-radius: 11px;
 }
+
 .result-row div {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 3px;
+  min-width: 0;
 }
+
 .result-row strong {
-  font-size: 11px;
+  color: #e7eefc;
+  font-size: 12px;
 }
+
 .result-row span {
   color: #91a3bf;
-  font-size: 9px;
-}
-.download-button {
-  padding: 7px 10px;
-  color: #071d1a;
-  background: #63d6b3;
-  border-radius: 8px;
   font-size: 10px;
-  font-weight: 800;
+}
+
+.download-button {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  color: #06241d;
+  background: #63d6b3;
   border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
   cursor: pointer;
 }
+
 .footer-note {
-  padding: 2px 4px 0;
-  color: #71839e;
-  font-size: 9px;
+  margin: 4px 0 0;
+  color: #91a3bf;
+  font-size: 10px;
   line-height: 1.7;
   text-align: center;
+}
+
+@media (min-width: 480px) {
+  .option-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 </style>
