@@ -39,7 +39,7 @@ const quickActions = features.filter(
       </RouterLink>
     </div>
     <div
-      class="grid place-items-center gap-2 py-9 sm:grid-cols-2 lg:grid-cols-2"
+      class="grid place-items-center gap-2 py-9 sm:grid-cols-3 lg:grid-cols-3"
     >
       <RouterLink
         to="/settings"
@@ -48,6 +48,15 @@ const quickActions = features.filter(
         <h2 class="mb-1 font-semibold">تنظیمات</h2>
         <p class="text-sm text-slate-600 dark:text-slate-400">
           مدیریت مدل‌ها و کش
+        </p>
+      </RouterLink>
+      <RouterLink
+        to="/history"
+        class="flex w-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 text-center transition hover:border-emerald-500 dark:border-slate-800 dark:bg-slate-900"
+      >
+        <h2 class="mb-1 font-semibold">تاریخچه</h2>
+        <p class="text-sm text-slate-600 dark:text-slate-400">
+          ادامه یا ویرایش کارهای قبلی
         </p>
       </RouterLink>
       <RouterLink

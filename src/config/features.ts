@@ -46,6 +46,15 @@ export const features: readonly Feature[] = [
     load: () => import('@/pages/SettingsPage.vue'),
   },
   {
+    path: '/history',
+    name: 'history',
+    label: 'تاریخچه',
+    description: 'تاریخچه همه ابزارها؛ ادامه یا ویرایش کارها',
+    showInNav: false,
+    showInHome: false,
+    load: () => import('@/pages/HistoryPage.vue'),
+  },
+  {
     path: '/about',
     name: 'about',
     label: 'درباره',

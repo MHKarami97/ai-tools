@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import HistoryList from '@/components/HistoryList.vue'
 import { encodeMp3 } from '@/lib/audio/mp3Client'
 import { decodeToMono } from '@/lib/audio/resample'
 import { encodeWav } from '@/lib/audio/wav'
 import { formatBytes } from '@/lib/format'
+import type { TtsEntryState } from '@/lib/history/entryStates'
 import { historyStore } from '@/lib/history/historyStore'
 import { requestPersistentStorage } from '@/lib/storageEstimate'
 import { TtsClient } from '@/lib/tts/client'
@@ -188,16 +190,66 @@ function synthesize(): void {
       mp3Size.value = mp3?.size ?? 0
       outputName.value = `tts-${timestampName()}.${mp3 ? 'mp3' : 'wav'}`
 
-      await historyStore.add({
-        kind: 'tts',
-        sourceName: text.value.trim().slice(0, SOURCE_PREVIEW_CHARS),
-        outputs: [outputName.value],
-      })
+      await saveHistory(wav, mp3)
     } finally {
       task.value = null
     }
   })
 }
+
+const route = useRoute()
+const router = useRouter()
+let currentEntryId: number | null = null
+
+async function saveHistory(wav: Blob, mp3: Blob | null): Promise<void> {
+  try {
+    await requestPersistentStorage()
+    const state: TtsEntryState = { text: text.value.trim(), mode: mode.value, pace: pace.value }
+    const id = await historyStore.add(
+      {
+        kind: 'tts',
+        sourceName: text.value.trim().slice(0, SOURCE_PREVIEW_CHARS),
+        outputs: [outputName.value],
+        stage: 'synthesized',
+        state,
+      },
+      { wav, mp3 },
+    )
+    currentEntryId = id
+    await router.replace({ query: { resume: String(id) } })
+  } catch (error) {
+    console.error('History save failed', error)
+  }
+}
+
+async function resumeEntry(id: number): Promise<void> {
+  if (id === currentEntryId || busy.value) return
+  await guarded(async () => {
+    const entry = await historyStore.get(id)
+    const state = entry?.state as TtsEntryState | null | undefined
+    if (!entry || entry.kind !== 'tts' || !state) throw new Error('این مورد قابل ادامه نیست.')
+    const [wav, mp3] = await Promise.all([historyStore.getBlob(id, 'wav'), historyStore.getBlob(id, 'mp3')])
+    revokeOutputs()
+    text.value = state.text
+    mode.value = state.mode
+    pace.value = state.pace
+    wavUrl.value = wav ? URL.createObjectURL(wav) : null
+    mp3Url.value = mp3 ? URL.createObjectURL(mp3) : null
+    wavSize.value = wav?.size ?? 0
+    mp3Size.value = mp3?.size ?? 0
+    outputName.value = entry.outputs[0] ?? ''
+    currentEntryId = id
+  })
+}
+
+watch(
+  () => route.query.resume,
+  (value) => {
+    const id = Number(value)
+    if (Number.isInteger(id) && id > 0) void resumeEntry(id)
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   modelsReady.value = await allModelsCached()

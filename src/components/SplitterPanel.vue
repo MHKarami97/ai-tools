@@ -171,7 +171,8 @@
           :key="exportVersion"
           :vocals="vocalStem"
           :vocals-blob="exported.vocals"
-          :source-name="selectedFile?.name ?? ''"
+          :source-name="activeName"
+          :entry-id="entryId"
         />
       </template>
 
@@ -209,7 +210,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, ref, shallowRef, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   SplitterClient,
   downloadBlob,
@@ -228,7 +230,10 @@ import {
   type SilenceTrimOptions,
   type TrimSensitivity,
 } from "@/lib/audio/silenceTrimmer";
+import { stemDecoder } from "@/lib/audio/stemDecoder";
+import type { SplitterEntryState } from "@/lib/history/entryStates";
 import { historyStore } from "@/lib/history/historyStore";
+import { requestPersistentStorage } from "@/lib/storageEstimate";
 import { performanceLog } from "@/lib/system/performanceLog";
 import type { VocalStem } from "@/lib/video/videoExporter";
 
@@ -270,6 +275,14 @@ const trimStats = ref<TrimStats | null>(null);
 const vocalStem = shallowRef<VocalStem | null>(null);
 const showVideoTool = ref(false);
 const exportVersion = ref(0);
+
+const route = useRoute();
+const router = useRouter();
+const entryId = ref<number | null>(null);
+const restoredName = ref<string | null>(null);
+const activeName = computed(
+  () => selectedFile.value?.name ?? restoredName.value ?? "",
+);
 
 const trimVocals = ref(true);
 const trimInstrumental = ref(false);
@@ -335,6 +348,8 @@ function onDrop(event: DragEvent): void {
 }
 
 function resetOutputs(): void {
+  entryId.value = null;
+  restoredName.value = null;
   result.value = null;
   exported.value = null;
   trimStats.value = null;
@@ -457,7 +472,7 @@ function prepareStem(
 }
 
 async function buildExports(
-  source: File,
+  sourceName: string,
   data: SplitterResult,
   recordHistory: boolean,
 ): Promise<void> {
@@ -529,14 +544,13 @@ async function buildExports(
     };
     exportVersion.value += 1;
 
-    if (recordHistory) {
-      const name = baseName(source.name);
-      await historyStore.add({
-        kind: "splitter",
-        sourceName: source.name,
-        outputs: [`${name}-vocals.${ext}`, `${name}-instrumental.${ext}`],
-      });
-    }
+    await persistHistory(
+      sourceName,
+      ext,
+      vocalsBlob,
+      instrumentalBlob,
+      recordHistory,
+    );
   } finally {
     isExporting.value = false;
   }
@@ -581,7 +595,7 @@ async function startSeparation(): Promise<void> {
     isProcessing.value = false;
 
     if (result.value) {
-      await buildExports(source, result.value, true);
+      await buildExports(source.name, result.value, true);
     }
 
     statusText.value = "انجام شد";
@@ -596,10 +610,10 @@ async function startSeparation(): Promise<void> {
 }
 
 async function rebuildExports(): Promise<void> {
-  if (!selectedFile.value || !result.value || isBusy.value) return;
+  if (!activeName.value || !result.value || isBusy.value) return;
 
   try {
-    await buildExports(selectedFile.value, result.value, false);
+    await buildExports(activeName.value, result.value, false);
     statusText.value = "انجام شد";
     statusDetail.value = "خروجی با تنظیمات جدید ساخته شد.";
   } catch (error) {
@@ -620,13 +634,140 @@ function cancelSeparation(): void {
 }
 
 function downloadResult(kind: "vocals" | "instrumental"): void {
-  if (!exported.value || !selectedFile.value) return;
+  if (!exported.value || !activeName.value) return;
 
   downloadBlob(
     exported.value[kind],
-    `${baseName(selectedFile.value.name)}-${kind}.${exported.value.ext}`,
+    `${baseName(activeName.value)}-${kind}.${exported.value.ext}`,
   );
 }
+
+async function persistHistory(
+  name: string,
+  ext: "mp3" | "wav",
+  vocalsBlob: Blob,
+  instrumentalBlob: Blob,
+  isNewJob: boolean,
+): Promise<void> {
+  const base = baseName(name);
+  const outputs = [`${base}-vocals.${ext}`, `${base}-instrumental.${ext}`];
+  const state: Partial<SplitterEntryState> = {
+    ext,
+    trimVocals: trimVocals.value,
+    trimInstrumental: trimInstrumental.value,
+    sensitivity: sensitivity.value,
+    minSilenceSeconds: minSilenceSeconds.value,
+    trimStats: trimStats.value ?? { vocals: 0, instrumental: 0 },
+  };
+  const blobs = { vocals: vocalsBlob, instrumental: instrumentalBlob };
+
+  try {
+    if (isNewJob || entryId.value === null) {
+      await requestPersistentStorage();
+      const id = await historyStore.add(
+        {
+          kind: "splitter",
+          sourceName: name,
+          outputs,
+          stage: "separated",
+          state: { ...state, fileBytes: selectedFile.value?.size ?? 0 },
+        },
+        blobs,
+      );
+      entryId.value = id;
+      await router.replace({
+        query: { ...route.query, resume: String(id) },
+        hash: route.hash,
+      });
+    } else {
+      await historyStore.update(entryId.value, { outputs, state }, blobs);
+    }
+  } catch (error) {
+    console.error("History save failed", error);
+  }
+}
+
+async function resumeEntry(id: number): Promise<void> {
+  if (id === entryId.value || isBusy.value) return;
+
+  isExporting.value = true;
+  statusText.value = "در حال بارگذاری از تاریخچه";
+  statusDetail.value = "خواندن فایل‌های ذخیره‌شده...";
+  progressPercent.value = 100;
+
+  try {
+    const entry = await historyStore.get(id);
+    const state = entry?.state as SplitterEntryState | null | undefined;
+    if (!entry || entry.kind !== "splitter" || !state) {
+      throw new Error("این مورد قابل ادامه نیست.");
+    }
+
+    const [vocalsBlob, instrumentalBlob] = await Promise.all([
+      historyStore.getBlob(id, "vocals"),
+      historyStore.getBlob(id, "instrumental"),
+    ]);
+    if (!vocalsBlob || !instrumentalBlob) {
+      throw new Error("فایل‌های ذخیره‌شده پیدا نشد.");
+    }
+
+    const [vocals, instrumental] = await Promise.all([
+      stemDecoder.decode(vocalsBlob, TARGET_SAMPLE_RATE),
+      stemDecoder.decode(instrumentalBlob, TARGET_SAMPLE_RATE),
+    ]);
+
+    selectedFile.value = null;
+    resetOutputs();
+    restoredName.value = entry.sourceName;
+    fileMeta.value = {
+      name: entry.sourceName,
+      size: formatBytes(state.fileBytes ?? 0),
+    };
+    trimVocals.value = state.trimVocals;
+    trimInstrumental.value = state.trimInstrumental;
+    sensitivity.value = state.sensitivity;
+    minSilenceSeconds.value = state.minSilenceSeconds;
+
+    result.value = {
+      sampleRate: vocals.sampleRate,
+      vocalsLeft: vocals.left,
+      vocalsRight: vocals.right,
+      instrumentalLeft: instrumental.left,
+      instrumentalRight: instrumental.right,
+    };
+    exported.value = {
+      vocals: vocalsBlob,
+      instrumental: instrumentalBlob,
+      ext: state.ext,
+    };
+    trimStats.value = state.trimStats;
+    vocalStem.value = {
+      left: vocals.left,
+      right: vocals.right,
+      sampleRate: vocals.sampleRate,
+    };
+    entryId.value = id;
+    showVideoTool.value = Boolean(state.video);
+    exportVersion.value += 1;
+
+    statusText.value = "از تاریخچه بارگذاری شد";
+    statusDetail.value = "می‌توانید ویرایش کنید یا ساخت ویدئو را ادامه دهید.";
+  } catch (error) {
+    statusText.value = "خطا";
+    statusDetail.value = (error as Error).message;
+    progressPercent.value = 0;
+  } finally {
+    isExporting.value = false;
+  }
+}
+
+watch(
+  () => route.query.resume,
+  (value) => {
+    const id = Number(value);
+    if (Number.isInteger(id) && id > 0) void resumeEntry(id);
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped>

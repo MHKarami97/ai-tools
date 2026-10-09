@@ -523,17 +523,26 @@ import {
   type TimeRange,
 } from "@/lib/lyrics/types";
 import { baseName } from "@/lib/splitter/client";
+import type { LyricVideoDraft } from "@/lib/history/entryStates";
+import type { HistoryStage } from "@/lib/history/historyStore";
+import {
+  lyricDraftRepository,
+  type LoadedLyricDraft,
+  type LyricAssetSlot,
+} from "@/lib/history/lyricDraftRepository";
 
 const props = defineProps<{
   vocals: VocalStem;
   vocalsBlob: Blob;
   sourceName: string;
+  entryId?: number | null;
 }>();
 
 const RECOMMENDED_MAX_SECONDS = 90;
 const DEFAULT_CLIP_SECONDS = 60;
 const PREVIEW_LONG_SIDE = 640;
 const ALIGN_DEBOUNCE_MS = 250;
+const SAVE_DEBOUNCE_MS = 1000;
 
 const lineBuilder = new LineBuilder();
 const aligner = new LyricsAligner();
@@ -669,6 +678,172 @@ const style = computed<VideoStyle>(() => ({
   backgroundImage: backgroundBitmap.value,
   imageDim: imageDim.value,
 }));
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let restoring = true;
+
+const currentDraft = computed<LyricVideoDraft>(() => ({
+  rangeStart: rangeStart.value,
+  rangeEnd: rangeEnd.value,
+  languageCode: languageCode.value,
+  modelId: modelId.value,
+  profile: profile.value,
+  words: words.value,
+  lyricsText: lyricsText.value,
+  maxWordsPerLine: maxWordsPerLine.value,
+  transcribedRange: transcribedRange.value,
+  sizePresetId: sizePresetId.value,
+  customWidth: customWidth.value,
+  customHeight: customHeight.value,
+  fps: fps.value,
+  fontId: fontId.value,
+  fontWeight: fontWeight.value,
+  fontScale: fontScale.value,
+  animation: animation.value,
+  textColor: textColor.value,
+  highlightColor: highlightColor.value,
+  showContext: showContext.value,
+  textShadow: textShadow.value,
+  backgroundKind: backgroundKind.value,
+  backgroundColor: backgroundColor.value,
+  gradientFrom: gradientFrom.value,
+  gradientTo: gradientTo.value,
+  gradientAngle: gradientAngle.value,
+  imageDim: imageDim.value,
+  resultInfo: resultInfo.value,
+}));
+
+function currentStage(): HistoryStage | undefined {
+  if (resultBlob.value) return "video";
+  return lines.value.length > 0 ? "lyrics" : undefined;
+}
+
+function clearSaveTimer(): void {
+  if (saveTimer === null) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+}
+
+function scheduleSave(): void {
+  if (restoring || !props.entryId) return;
+  clearSaveTimer();
+  saveTimer = setTimeout(() => void persistDraft(), SAVE_DEBOUNCE_MS);
+}
+
+async function persistDraft(video?: Blob): Promise<void> {
+  clearSaveTimer();
+  const id = props.entryId;
+  if (!id || restoring) return;
+
+  try {
+    await lyricDraftRepository.save(id, currentDraft.value, currentStage(), video);
+  } catch (error) {
+    console.error("Lyric draft save failed", error);
+  }
+}
+
+async function persistAsset(slot: LyricAssetSlot, blob: Blob): Promise<void> {
+  const id = props.entryId;
+  if (!id) return;
+
+  try {
+    await lyricDraftRepository.saveAsset(id, slot, blob);
+  } catch (error) {
+    console.error("Lyric asset save failed", error);
+  }
+}
+
+async function restoreAssets(saved: LoadedLyricDraft): Promise<void> {
+  if (saved.font) {
+    try {
+      customFontFamily.value = await fontLoader.loadFromFile(
+        new File([saved.font], "font"),
+      );
+    } catch (error) {
+      console.error("Saved font could not be loaded", error);
+    }
+  }
+
+  if (saved.background) {
+    try {
+      backgroundBitmap.value = await createImageBitmap(saved.background);
+    } catch (error) {
+      console.error("Saved background could not be loaded", error);
+    }
+  }
+}
+
+function applyDraft(draft: LyricVideoDraft, video: Blob | null): void {
+  rangeStart.value = draft.rangeStart ?? rangeStart.value;
+  rangeEnd.value = draft.rangeEnd ?? rangeEnd.value;
+  languageCode.value = draft.languageCode ?? null;
+  modelId.value = draft.modelId ?? modelId.value;
+  profile.value = (draft.profile as ExecutionProfile) ?? profile.value;
+  words.value = draft.words ?? [];
+  lyricsText.value = draft.lyricsText ?? "";
+  maxWordsPerLine.value = draft.maxWordsPerLine ?? maxWordsPerLine.value;
+  transcribedRange.value = draft.transcribedRange ?? null;
+
+  sizePresetId.value = draft.sizePresetId ?? sizePresetId.value;
+  customWidth.value = draft.customWidth ?? customWidth.value;
+  customHeight.value = draft.customHeight ?? customHeight.value;
+  fps.value = draft.fps ?? fps.value;
+
+  const fontAvailable =
+    draft.fontId !== "custom" || customFontFamily.value.length > 0;
+  fontId.value = fontAvailable ? draft.fontId : FONT_OPTIONS[0].id;
+  fontWeight.value = draft.fontWeight ?? fontWeight.value;
+  fontScale.value = draft.fontScale ?? fontScale.value;
+  animation.value = (draft.animation as TextAnimation) ?? animation.value;
+  textColor.value = draft.textColor ?? textColor.value;
+  highlightColor.value = draft.highlightColor ?? highlightColor.value;
+  showContext.value = draft.showContext ?? showContext.value;
+  textShadow.value = draft.textShadow ?? textShadow.value;
+  backgroundKind.value =
+    (draft.backgroundKind as BackgroundKind) ?? backgroundKind.value;
+  backgroundColor.value = draft.backgroundColor ?? backgroundColor.value;
+  gradientFrom.value = draft.gradientFrom ?? gradientFrom.value;
+  gradientTo.value = draft.gradientTo ?? gradientTo.value;
+  gradientAngle.value = draft.gradientAngle ?? gradientAngle.value;
+  imageDim.value = draft.imageDim ?? imageDim.value;
+  normalizeRange();
+
+  if (lyricsText.value.trim().length > 0) {
+    const span: TimeRange =
+      words.value.length > 0
+        ? (transcribedRange.value ?? range.value)
+        : range.value;
+    lines.value = aligner.align(words.value, lyricsText.value, span);
+  }
+
+  if (video && draft.resultInfo) {
+    resultBlob.value = video;
+    resultUrl.value = URL.createObjectURL(video);
+    resultInfo.value = draft.resultInfo;
+    exportStatus.value = "ویدئوی ذخیره‌شده از تاریخچه بارگذاری شد.";
+  }
+}
+
+async function restoreDraft(): Promise<void> {
+  const id = props.entryId;
+  if (!id) {
+    restoring = false;
+    return;
+  }
+
+  try {
+    const saved = await lyricDraftRepository.load(id);
+    await restoreAssets(saved);
+    if (saved.draft) applyDraft(saved.draft, saved.video);
+  } catch (error) {
+    console.error("Lyric draft restore failed", error);
+  } finally {
+    await nextTick();
+    restoring = false;
+  }
+}
+
+watch(currentDraft, scheduleSave);
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -807,6 +982,7 @@ async function onFontFile(event: Event): Promise<void> {
 
   try {
     customFontFamily.value = await fontLoader.loadFromFile(file);
+    void persistAsset("font", file);
     fontId.value = "custom";
     fontWeight.value = 400;
   } catch {
@@ -824,6 +1000,7 @@ async function onBackgroundFile(event: Event): Promise<void> {
     const bitmap = await createImageBitmap(file);
     backgroundBitmap.value?.close();
     backgroundBitmap.value = bitmap;
+    void persistAsset("background", file);
   } catch {
     exportStatus.value = "خواندن تصویر ناموفق بود.";
     exportFailed.value = true;
@@ -961,6 +1138,7 @@ async function exportVideo(): Promise<void> {
     resultBlob.value = result.blob;
     resultUrl.value = URL.createObjectURL(result.blob);
     resultInfo.value = `${result.videoCodec} + ${result.audioCodec} · ${formatBytes(result.blob.size)}`;
+    void persistDraft(result.blob);
     exportStatus.value =
       result.videoCodec === "avc" && result.audioCodec === "aac"
         ? "ویدئو آماده است."
@@ -1014,11 +1192,13 @@ watch(sizePresetId, (id) => {
 });
 
 onMounted(async () => {
+  await restoreDraft();
   await nextTick();
   await rebuildRenderer();
 });
 
 onBeforeUnmount(() => {
+  if (saveTimer !== null) void persistDraft();
   cancelAnimationFrame(rafId);
   if (alignTimer !== null) clearTimeout(alignTimer);
   transcribeClient.cancel();
