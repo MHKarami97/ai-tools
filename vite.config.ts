@@ -115,6 +115,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
         navigateFallback: "index.html",
+        navigateFallbackDenylist: [/^\/cdn-cgi\//, /\/[^/]+\.[a-z0-9]+$/i],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
