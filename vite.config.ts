@@ -113,10 +113,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg,avif,gif,woff,woff2,json,webmanifest}"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/cdn-cgi\//, /\/[^/]+\.[a-z0-9]+$/i],
         cleanupOutdatedCaches: true,
+        navigateFallbackDenylist: [/^\/cdn-cgi\//, /\/[^/]+\.[a-z0-9]+$/i],        
         runtimeCaching: [
           {
             urlPattern: /\/ort\/.+\.(?:mjs|wasm)$/,
