@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "mhk.ai-tools",
+      "package_name": "mhk.ai.tools",
       "sha256_cert_fingerprints": [
-        ""
+        "32:09:87:42:EE:BD:F3:61:A5:B4:0C:4E:3A:A7:58:78:BC:2C:44:B7:A3:F3:35:76:49:A9:A5:BB:F6:BF:9C:44"
       ]
     }
   },
@@ -13,9 +13,9 @@
     "relation": ["check_validation"],
     "target": {
       "namespace": "cafebazaar_twa",
-      "package_name": "mhk.ai-tools",
+      "package_name": "mhk.ai.tools",
       "sha256_cert_fingerprints": [
-        ""
+        "32:09:87:42:EE:BD:F3:61:A5:B4:0C:4E:3A:A7:58:78:BC:2C:44:B7:A3:F3:35:76:49:A9:A5:BB:F6:BF:9C:44"
       ]
     }
   }
