@@ -1211,16 +1211,71 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .lyric-panel {
+  --lp-card-bg: #ffffff;
+  --lp-card-border: #e2e8f0;
+  --lp-card-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --lp-text-main: #0f172a;
+  --lp-text-muted: #64748b;
+  --lp-input-bg: #f8fafc;
+  --lp-input-border: #cbd5e1;
+  --lp-input-text: #0f172a;
+  --lp-row-bg: #f8fafc;
+  --lp-progress-track: #e2e8f0;
+  --lp-progress-gradient: linear-gradient(90deg, #10b981, #3b82f6);
+  --lp-btn-primary-bg: linear-gradient(135deg, #059669, #2563eb);
+  --lp-btn-primary-text: #ffffff;
+  --lp-btn-secondary-bg: #ffffff;
+  --lp-btn-secondary-border: #cbd5e1;
+  --lp-btn-secondary-text: #334155;
+  --lp-btn-ghost-bg: #f1f5f9;
+  --lp-btn-ghost-border: #e2e8f0;
+  --lp-btn-ghost-text: #334155;
+  --lp-btn-download-bg: #059669;
+  --lp-btn-download-text: #ffffff;
+  --lp-accent: #059669;
+  --lp-pill-bg: rgba(16, 185, 129, 0.12);
+  --lp-pill-color: #047857;
+  --lp-warn: #b45309;
+
   margin-top: 6px;
+}
+
+:global(.dark) .lyric-panel {
+  --lp-card-bg: rgba(19, 29, 48, 0.88);
+  --lp-card-border: rgba(164, 188, 226, 0.16);
+  --lp-card-shadow: 0 12px 34px rgba(0, 0, 0, 0.25);
+  --lp-text-main: #e7eefc;
+  --lp-text-muted: #91a3bf;
+  --lp-input-bg: #0b1322;
+  --lp-input-border: rgba(164, 188, 226, 0.2);
+  --lp-input-text: #e7eefc;
+  --lp-row-bg: #17243a;
+  --lp-progress-track: #0b1322;
+  --lp-progress-gradient: linear-gradient(90deg, #1ea983, #7ea6ff);
+  --lp-btn-primary-bg: linear-gradient(135deg, #63d6b3, #82a9ff);
+  --lp-btn-primary-text: #06241d;
+  --lp-btn-secondary-bg: transparent;
+  --lp-btn-secondary-border: rgba(164, 188, 226, 0.28);
+  --lp-btn-secondary-text: #e7eefc;
+  --lp-btn-ghost-bg: #17243a;
+  --lp-btn-ghost-border: transparent;
+  --lp-btn-ghost-text: #e7eefc;
+  --lp-btn-download-bg: #63d6b3;
+  --lp-btn-download-text: #06241d;
+  --lp-accent: #63d6b3;
+  --lp-pill-bg: rgba(99, 214, 179, 0.12);
+  --lp-pill-color: #63d6b3;
+  --lp-warn: #f2c97d;
 }
 
 .card {
   margin-bottom: 13px;
   padding: 15px;
-  background: rgba(19, 29, 48, 0.88);
-  border: 1px solid rgba(164, 188, 226, 0.16);
+  background: var(--lp-card-bg);
+  border: 1px solid var(--lp-card-border);
   border-radius: 16px;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--lp-card-shadow);
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 .section-heading {
@@ -1232,14 +1287,14 @@ onBeforeUnmount(() => {
 }
 
 .section-heading strong {
-  color: #e7eefc;
+  color: var(--lp-text-main);
   font-size: 12px;
 }
 
 .pill {
   padding: 3px 9px;
-  color: #63d6b3;
-  background: rgba(99, 214, 179, 0.12);
+  color: var(--lp-pill-color);
+  background: var(--lp-pill-bg);
   border-radius: 99px;
   font-size: 10px;
   font-weight: 700;
@@ -1262,7 +1317,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   flex-direction: column;
   gap: 5px;
-  color: #91a3bf;
+  color: var(--lp-text-muted);
   font-size: 11px;
 }
 
@@ -1275,23 +1330,36 @@ onBeforeUnmount(() => {
 .field textarea {
   width: 100%;
   padding: 9px 10px;
-  color: #e7eefc;
-  background: #0b1322;
-  border: 1px solid rgba(164, 188, 226, 0.2);
+  color: var(--lp-input-text);
+  background: var(--lp-input-bg);
+  border: 1px solid var(--lp-input-border);
   border-radius: 9px;
   font: inherit;
   font-size: 12px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.field select:focus-visible,
+.field input[type="number"]:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 1px;
+}
+
+.field select option {
+  background: var(--lp-card-bg);
+  color: var(--lp-input-text);
 }
 
 .field input[type="file"] {
-  color: #91a3bf;
+  color: var(--lp-text-muted);
   font-size: 10px;
 }
 
 .field input[type="range"],
 .scrubber {
   width: 100%;
-  accent-color: #63d6b3;
+  accent-color: var(--lp-accent);
 }
 
 .field select:disabled,
@@ -1319,8 +1387,8 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 34px;
   padding: 2px;
-  background: #0b1322;
-  border: 1px solid rgba(164, 188, 226, 0.2);
+  background: var(--lp-input-bg);
+  border: 1px solid var(--lp-input-border);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -1330,7 +1398,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   padding: 6px 0;
-  color: #e7eefc;
+  color: var(--lp-text-main);
   font-size: 12px;
   cursor: pointer;
 }
@@ -1338,7 +1406,7 @@ onBeforeUnmount(() => {
 .toggle-row input {
   width: 16px;
   height: 16px;
-  accent-color: #63d6b3;
+  accent-color: var(--lp-accent);
 }
 
 .button-row {
@@ -1359,30 +1427,35 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 750;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
 .primary-button {
-  color: #06241d;
-  background: linear-gradient(135deg, #63d6b3, #82a9ff);
+  color: var(--lp-btn-primary-text);
+  background: var(--lp-btn-primary-bg);
 }
 
 .secondary-button {
   margin-top: 8px;
-  color: #e7eefc;
-  background: transparent;
-  border: 1px solid rgba(164, 188, 226, 0.28);
+  color: var(--lp-btn-secondary-text);
+  background: var(--lp-btn-secondary-bg);
+  border: 1px solid var(--lp-btn-secondary-border);
 }
 
 .ghost-button {
-  color: #e7eefc;
-  background: #17243a;
+  color: var(--lp-btn-ghost-text);
+  background: var(--lp-btn-ghost-bg);
+  border: 1px solid var(--lp-btn-ghost-border);
 }
 
 .download-button {
   margin-top: 10px;
-  color: #06241d;
-  background: #63d6b3;
+  color: var(--lp-btn-download-text);
+  background: var(--lp-btn-download-bg);
+}
+
+.download-button:hover {
+  opacity: 0.9;
 }
 
 .primary-button:disabled,
@@ -1394,13 +1467,13 @@ onBeforeUnmount(() => {
 
 .note {
   margin: 10px 0 0;
-  color: #91a3bf;
+  color: var(--lp-text-muted);
   font-size: 10px;
   line-height: 1.8;
 }
 
 .note.warn {
-  color: #f2c97d;
+  color: var(--lp-warn);
 }
 
 .status-block {
@@ -1410,13 +1483,13 @@ onBeforeUnmount(() => {
 .progress-track {
   height: 7px;
   overflow: hidden;
-  background: #0b1322;
+  background: var(--lp-progress-track);
   border-radius: 99px;
 }
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #1ea983, #7ea6ff);
+  background: var(--lp-progress-gradient);
   border-radius: inherit;
   transition: width 0.25s ease;
 }
@@ -1439,6 +1512,7 @@ onBeforeUnmount(() => {
   max-height: 55vh;
   margin: 0 auto 12px;
   background: #000;
+  border: 1px solid var(--lp-card-border);
   border-radius: 12px;
 }
 
@@ -1453,6 +1527,7 @@ onBeforeUnmount(() => {
   max-height: 60vh;
   margin: 0 auto;
   background: #000;
+  border: 1px solid var(--lp-card-border);
   border-radius: 12px;
 }
 
