@@ -1211,61 +1211,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .lyric-panel {
-  --lp-card-bg: #ffffff;
-  --lp-card-border: #e2e8f0;
-  --lp-card-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-  --lp-text-main: #0f172a;
-  --lp-text-muted: #64748b;
-  --lp-input-bg: #f8fafc;
-  --lp-input-border: #cbd5e1;
-  --lp-input-text: #0f172a;
-  --lp-row-bg: #f8fafc;
-  --lp-progress-track: #e2e8f0;
-  --lp-progress-gradient: linear-gradient(90deg, #10b981, #3b82f6);
-  --lp-btn-primary-bg: linear-gradient(135deg, #059669, #2563eb);
-  --lp-btn-primary-text: #ffffff;
-  --lp-btn-secondary-bg: #ffffff;
-  --lp-btn-secondary-border: #cbd5e1;
-  --lp-btn-secondary-text: #334155;
-  --lp-btn-ghost-bg: #f1f5f9;
-  --lp-btn-ghost-border: #e2e8f0;
-  --lp-btn-ghost-text: #334155;
-  --lp-btn-download-bg: #059669;
-  --lp-btn-download-text: #ffffff;
-  --lp-accent: #059669;
-  --lp-pill-bg: rgba(16, 185, 129, 0.12);
-  --lp-pill-color: #047857;
-  --lp-warn: #b45309;
-
   margin-top: 6px;
-}
-
-:global(.dark) .lyric-panel {
-  --lp-card-bg: rgba(19, 29, 48, 0.88);
-  --lp-card-border: rgba(164, 188, 226, 0.16);
-  --lp-card-shadow: 0 12px 34px rgba(0, 0, 0, 0.25);
-  --lp-text-main: #e7eefc;
-  --lp-text-muted: #91a3bf;
-  --lp-input-bg: #0b1322;
-  --lp-input-border: rgba(164, 188, 226, 0.2);
-  --lp-input-text: #e7eefc;
-  --lp-row-bg: #17243a;
-  --lp-progress-track: #0b1322;
-  --lp-progress-gradient: linear-gradient(90deg, #1ea983, #7ea6ff);
-  --lp-btn-primary-bg: linear-gradient(135deg, #63d6b3, #82a9ff);
-  --lp-btn-primary-text: #06241d;
-  --lp-btn-secondary-bg: transparent;
-  --lp-btn-secondary-border: rgba(164, 188, 226, 0.28);
-  --lp-btn-secondary-text: #e7eefc;
-  --lp-btn-ghost-bg: #17243a;
-  --lp-btn-ghost-border: transparent;
-  --lp-btn-ghost-text: #e7eefc;
-  --lp-btn-download-bg: #63d6b3;
-  --lp-btn-download-text: #06241d;
-  --lp-accent: #63d6b3;
-  --lp-pill-bg: rgba(99, 214, 179, 0.12);
-  --lp-pill-color: #63d6b3;
-  --lp-warn: #f2c97d;
 }
 
 .card {

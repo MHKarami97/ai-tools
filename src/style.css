@@ -6,6 +6,106 @@
   --font-sans: Vazirmatn, Tahoma, 'Segoe UI', system-ui, sans-serif;
 }
 
+:root {
+  --sp-card-bg: #ffffff;
+  --sp-card-border: #e2e8f0;
+  --sp-card-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --sp-text-main: #0f172a;
+  --sp-text-muted: #64748b;
+  --sp-eyebrow: #059669;
+  --sp-input-bg: #f8fafc;
+  --sp-input-border: #cbd5e1;
+  --sp-input-text: #0f172a;
+  --sp-row-bg: #f8fafc;
+  --sp-row-border: #e2e8f0;
+  --sp-progress-track: #e2e8f0;
+  --sp-progress-gradient: linear-gradient(90deg, #10b981, #3b82f6);
+  --sp-btn-primary-bg: linear-gradient(135deg, #059669, #2563eb);
+  --sp-btn-primary-text: #ffffff;
+  --sp-btn-secondary-bg: #ffffff;
+  --sp-btn-secondary-border: #cbd5e1;
+  --sp-btn-secondary-text: #334155;
+  --sp-btn-ghost-bg: #f1f5f9;
+  --sp-btn-ghost-border: #e2e8f0;
+  --sp-btn-ghost-text: #334155;
+  --sp-btn-download-bg: #059669;
+  --sp-btn-download-text: #ffffff;
+  --sp-accent: #059669;
+  --sp-drop-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(59, 130, 246, 0.04));
+  --sp-drop-border: rgba(16, 185, 129, 0.4);
+  --sp-drop-hover-bg: rgba(16, 185, 129, 0.08);
+  --sp-drop-hover-border: #10b981;
+  --sp-pill-bg: rgba(16, 185, 129, 0.12);
+  --sp-pill-color: #047857;
+  --sp-pill-muted-bg: #f1f5f9;
+  --sp-pill-muted-color: #64748b;
+  --sp-warn: #b45309;
+
+  --lp-card-bg: var(--sp-card-bg);
+  --lp-card-border: var(--sp-card-border);
+  --lp-card-shadow: var(--sp-card-shadow);
+  --lp-text-main: var(--sp-text-main);
+  --lp-text-muted: var(--sp-text-muted);
+  --lp-input-bg: var(--sp-input-bg);
+  --lp-input-border: var(--sp-input-border);
+  --lp-input-text: var(--sp-input-text);
+  --lp-row-bg: var(--sp-row-bg);
+  --lp-progress-track: var(--sp-progress-track);
+  --lp-progress-gradient: var(--sp-progress-gradient);
+  --lp-btn-primary-bg: var(--sp-btn-primary-bg);
+  --lp-btn-primary-text: var(--sp-btn-primary-text);
+  --lp-btn-secondary-bg: var(--sp-btn-secondary-bg);
+  --lp-btn-secondary-border: var(--sp-btn-secondary-border);
+  --lp-btn-secondary-text: var(--sp-btn-secondary-text);
+  --lp-btn-ghost-bg: var(--sp-btn-ghost-bg);
+  --lp-btn-ghost-border: var(--sp-btn-ghost-border);
+  --lp-btn-ghost-text: var(--sp-btn-ghost-text);
+  --lp-btn-download-bg: var(--sp-btn-download-bg);
+  --lp-btn-download-text: var(--sp-btn-download-text);
+  --lp-accent: var(--sp-accent);
+  --lp-pill-bg: var(--sp-pill-bg);
+  --lp-pill-color: var(--sp-pill-color);
+  --lp-warn: var(--sp-warn);
+}
+
+:root.dark,
+html.dark,
+.dark {
+  --sp-card-bg: rgba(19, 29, 48, 0.88);
+  --sp-card-border: rgba(164, 188, 226, 0.16);
+  --sp-card-shadow: 0 12px 34px rgba(0, 0, 0, 0.25);
+  --sp-text-main: #e7eefc;
+  --sp-text-muted: #91a3bf;
+  --sp-eyebrow: #63d6b3;
+  --sp-input-bg: #0b1322;
+  --sp-input-border: rgba(164, 188, 226, 0.2);
+  --sp-input-text: #e7eefc;
+  --sp-row-bg: #17243a;
+  --sp-row-border: rgba(164, 188, 226, 0.1);
+  --sp-progress-track: #0b1322;
+  --sp-progress-gradient: linear-gradient(90deg, #1ea983, #7ea6ff);
+  --sp-btn-primary-bg: linear-gradient(135deg, #63d6b3, #82a9ff);
+  --sp-btn-primary-text: #06241d;
+  --sp-btn-secondary-bg: transparent;
+  --sp-btn-secondary-border: rgba(164, 188, 226, 0.28);
+  --sp-btn-secondary-text: #e7eefc;
+  --sp-btn-ghost-bg: #17243a;
+  --sp-btn-ghost-border: transparent;
+  --sp-btn-ghost-text: #e7eefc;
+  --sp-btn-download-bg: #63d6b3;
+  --sp-btn-download-text: #06241d;
+  --sp-accent: #63d6b3;
+  --sp-drop-bg: linear-gradient(135deg, rgba(99, 214, 179, 0.08), rgba(87, 121, 198, 0.08));
+  --sp-drop-border: rgba(99, 214, 179, 0.58);
+  --sp-drop-hover-bg: rgba(99, 214, 179, 0.14);
+  --sp-drop-hover-border: #63d6b3;
+  --sp-pill-bg: rgba(99, 214, 179, 0.12);
+  --sp-pill-color: #63d6b3;
+  --sp-pill-muted-bg: rgba(145, 163, 191, 0.14);
+  --sp-pill-muted-color: #91a3bf;
+  --sp-warn: #f2c97d;
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
 }

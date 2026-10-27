@@ -772,71 +772,9 @@ watch(
 
 <style scoped>
 .splitter-panel {
-  --sp-card-bg: #ffffff;
-  --sp-card-border: #e2e8f0;
-  --sp-card-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-  --sp-text-main: #0f172a;
-  --sp-text-muted: #64748b;
-  --sp-eyebrow: #059669;
-  --sp-input-bg: #f8fafc;
-  --sp-input-border: #cbd5e1;
-  --sp-input-text: #0f172a;
-  --sp-row-bg: #f8fafc;
-  --sp-row-border: #e2e8f0;
-  --sp-progress-track: #e2e8f0;
-  --sp-progress-gradient: linear-gradient(90deg, #10b981, #3b82f6);
-  --sp-btn-primary-bg: linear-gradient(135deg, #059669, #2563eb);
-  --sp-btn-primary-text: #ffffff;
-  --sp-btn-secondary-bg: #ffffff;
-  --sp-btn-secondary-border: #cbd5e1;
-  --sp-btn-secondary-text: #334155;
-  --sp-btn-download-bg: #059669;
-  --sp-btn-download-text: #ffffff;
-  --sp-accent: #059669;
-  --sp-drop-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(59, 130, 246, 0.04));
-  --sp-drop-border: rgba(16, 185, 129, 0.4);
-  --sp-drop-hover-bg: rgba(16, 185, 129, 0.08);
-  --sp-drop-hover-border: #10b981;
-  --sp-pill-bg: rgba(16, 185, 129, 0.12);
-  --sp-pill-color: #047857;
-  --sp-pill-muted-bg: #f1f5f9;
-  --sp-pill-muted-color: #64748b;
-
   max-width: 520px;
   margin: 0 auto;
   padding: 20px 16px 24px;
-}
-
-:global(.dark) .splitter-panel {
-  --sp-card-bg: rgba(19, 29, 48, 0.88);
-  --sp-card-border: rgba(164, 188, 226, 0.16);
-  --sp-card-shadow: 0 12px 34px rgba(0, 0, 0, 0.25);
-  --sp-text-main: #e7eefc;
-  --sp-text-muted: #91a3bf;
-  --sp-eyebrow: #63d6b3;
-  --sp-input-bg: #0b1322;
-  --sp-input-border: rgba(164, 188, 226, 0.2);
-  --sp-input-text: #e7eefc;
-  --sp-row-bg: #17243a;
-  --sp-row-border: rgba(164, 188, 226, 0.1);
-  --sp-progress-track: #0b1322;
-  --sp-progress-gradient: linear-gradient(90deg, #1ea983, #7ea6ff);
-  --sp-btn-primary-bg: linear-gradient(135deg, #63d6b3, #82a9ff);
-  --sp-btn-primary-text: #06241d;
-  --sp-btn-secondary-bg: transparent;
-  --sp-btn-secondary-border: rgba(164, 188, 226, 0.28);
-  --sp-btn-secondary-text: #e7eefc;
-  --sp-btn-download-bg: #63d6b3;
-  --sp-btn-download-text: #06241d;
-  --sp-accent: #63d6b3;
-  --sp-drop-bg: linear-gradient(135deg, rgba(99, 214, 179, 0.08), rgba(87, 121, 198, 0.08));
-  --sp-drop-border: rgba(99, 214, 179, 0.58);
-  --sp-drop-hover-bg: rgba(99, 214, 179, 0.14);
-  --sp-drop-hover-border: #63d6b3;
-  --sp-pill-bg: rgba(99, 214, 179, 0.12);
-  --sp-pill-color: #63d6b3;
-  --sp-pill-muted-bg: rgba(145, 163, 191, 0.14);
-  --sp-pill-muted-color: #91a3bf;
 }
 
 .hero {
